@@ -1,26 +1,118 @@
 @import "tailwindcss";
 
+/* Class-based dark mode for Tailwind v4 */
+@variant dark (&:where(.dark, .dark *));
+
+/* ── Light theme tokens ─────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg-page:        #f7f5f0;
+  --bg-nav:         rgba(255, 255, 255, 0.85);
+  --bg-card:        #ffffff;
+  --bg-card-inner:  #f8fafc;
+  --bg-badge:       rgba(255, 255, 255, 0.88);
+  --bg-tag:         #f1f5f9;
+  --bg-toggle:      #ffffff;
+  --bg-footer:      rgba(255, 255, 255, 0.65);
+  --bg-cta:         #0f172a;
+  --bg-step:        #ffffff;
+  --bg-icon:        #eef2ff;
+  --bg-pill:        #f1f5f9;
+  --bg-hero-card:   rgba(255, 255, 255, 0.92);
+  --bg-row:         #f8fafc;
+  --bg-row-hover:   rgba(238, 242, 255, 0.45);
+  --bg-btn-outline: #ffffff;
+  --bg-count:       #ffffff;
+
+  --border-nav:     rgba(226, 232, 240, 0.85);
+  --border-card:    rgba(226, 232, 240, 0.85);
+  --border-badge:   rgba(203, 213, 225, 0.75);
+  --border-toggle:  rgb(226, 232, 240);
+  --border-footer:  rgba(226, 232, 240, 0.85);
+  --border-step:    rgba(226, 232, 240, 0.85);
+  --border-row:     rgb(226, 232, 240);
+  --border-row-hover: rgb(199, 210, 254);
+  --border-btn-outline: rgb(203, 213, 225);
+  --border-count:   rgb(226, 232, 240);
+
+  --text-page:      #0f0f0f;
+  --text-heading:   #0f172a;
+  --text-sub:       #1e293b;
+  --text-muted:     rgb(100, 116, 139);
+  --text-nav:       rgb(100, 116, 139);
+  --text-nav-hover: #0f172a;
+  --text-tag:       rgb(71, 85, 105);
+  --text-toggle:    rgb(71, 85, 105);
+  --text-footer:    rgb(148, 163, 184);
+  --text-count:     rgb(71, 85, 105);
+  --text-btn-outline: rgb(51, 65, 85);
+  --text-cta:       #0f172a;
+
+  --btn-primary-bg: #0f172a;
+  --btn-primary-fg: #ffffff;
+  --btn-primary-hover: #334155;
+
+  --dot-badge:      rgb(148, 163, 184);
+  --shadow-card:    rgba(99, 102, 241, 0.08);
+  --shadow-hero:    rgba(99, 102, 241, 0.35);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ── Dark theme tokens ──────────────────────────────── */
+.dark {
+  --bg-page:        #08080f;
+  --bg-nav:         rgba(8, 8, 15, 0.88);
+  --bg-card:        #111119;
+  --bg-card-inner:  #0d0d16;
+  --bg-badge:       rgba(15, 15, 30, 0.72);
+  --bg-tag:         #1e1e30;
+  --bg-toggle:      #1a1a28;
+  --bg-footer:      rgba(8, 8, 15, 0.72);
+  --bg-cta:         #1e1b4b;
+  --bg-step:        #111119;
+  --bg-icon:        #1e1b4b;
+  --bg-pill:        #1e1e30;
+  --bg-hero-card:   rgba(17, 17, 25, 0.92);
+  --bg-row:         #0d0d16;
+  --bg-row-hover:   rgba(55, 48, 163, 0.15);
+  --bg-btn-outline: #111119;
+  --bg-count:       #1a1a28;
+
+  --border-nav:     rgba(30, 27, 75, 0.85);
+  --border-card:    rgba(30, 41, 59, 0.85);
+  --border-badge:   rgba(51, 65, 85, 0.75);
+  --border-toggle:  rgb(51, 65, 85);
+  --border-footer:  rgba(30, 41, 59, 0.85);
+  --border-step:    rgba(30, 41, 59, 0.85);
+  --border-row:     rgb(30, 41, 59);
+  --border-row-hover: rgb(79, 70, 229);
+  --border-btn-outline: rgb(51, 65, 85);
+  --border-count:   rgb(51, 65, 85);
+
+  --text-page:      #ececf0;
+  --text-heading:   #f1f5f9;
+  --text-sub:       #e2e8f0;
+  --text-muted:     rgb(148, 163, 184);
+  --text-nav:       rgb(148, 163, 184);
+  --text-nav-hover: #f1f5f9;
+  --text-tag:       rgb(148, 163, 184);
+  --text-toggle:    rgb(203, 213, 225);
+  --text-footer:    rgb(100, 116, 139);
+  --text-count:     rgb(148, 163, 184);
+  --text-btn-outline: rgb(203, 213, 225);
+  --text-cta:       #f1f5f9;
+
+  --btn-primary-bg: #ffffff;
+  --btn-primary-fg: #0f172a;
+  --btn-primary-hover: #e2e8f0;
+
+  --dot-badge:      rgb(100, 116, 139);
+  --shadow-card:    rgba(99, 102, 241, 0.04);
+  --shadow-hero:    rgba(99, 102, 241, 0.12);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* ── Base ───────────────────────────────────────────── */
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg-page);
+  color: var(--text-page);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
