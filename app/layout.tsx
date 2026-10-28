@@ -17,9 +17,6 @@ export const metadata: Metadata = {
   title: "PartnerMatcher — Find your study partner",
   description:
     "Discover compatible study partners based on your courses, learning goals, and availability. Make every study session more meaningful.",
-  icons: {
-    icon: "/fav.png",
-  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
