@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
@@ -77,7 +77,11 @@ function ProgressBar({ step }: { step: Step }) {
 
 export function OnboardingClient({ user }: { user: User }) {
   const router = useRouter();
-  const supabase = createClient();
+  const clientRef = useRef<ReturnType<typeof createClient> | null>(null);
+  const getSupabase = () => {
+    if (!clientRef.current) clientRef.current = createClient();
+    return clientRef.current;
+  };
 
   const [step, setStep] = useState<Step>(1);
   const [loading, setLoading] = useState(false);
@@ -174,7 +178,7 @@ export function OnboardingClient({ user }: { user: User }) {
       if (courseErr || !courseRow) continue;
 
       // Insert user_course (ignore if duplicate)
-      await supabase.from("user_courses").upsert(
+      await getSupabase().from("user_courses").upsert(
         { user_id: user.id, course_id: courseRow.id, goal: c.goal, semester: "Fall 2026" },
         { onConflict: "user_id,course_id,goal", ignoreDuplicates: true }
       );

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -90,7 +90,11 @@ export default function SignUpPage() {
   const [error, setError] = useState("");
   const [emailSent, setEmailSent] = useState(false);
 
-  const supabase = createClient();
+  const clientRef = useRef<ReturnType<typeof createClient> | null>(null);
+  const getSupabase = () => {
+    if (!clientRef.current) clientRef.current = createClient();
+    return clientRef.current;
+  };
 
   async function handleSignUp(e: React.SyntheticEvent) {
     e.preventDefault();
@@ -114,7 +118,7 @@ export default function SignUpPage() {
       }
 
       // User created and pre-confirmed — sign in immediately
-      const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+      const { error: signInErr } = await getSupabase().auth.signInWithPassword({ email, password });
       if (signInErr) {
         setError(signInErr.message);
         setLoading(false);
@@ -127,7 +131,7 @@ export default function SignUpPage() {
     }
 
     // ── Standard path: signUp() + confirmation email ──
-    const { error } = await supabase.auth.signUp({
+    const { error } = await getSupabase().auth.signUp({
       email,
       password,
       options: {
@@ -149,7 +153,7 @@ export default function SignUpPage() {
   async function handleOAuth(provider: "github" | "google") {
     setLoading(true);
     setError("");
-    const { error } = await supabase.auth.signInWithOAuth({
+    const { error } = await getSupabase().auth.signInWithOAuth({
       provider,
       options: { redirectTo: `${window.location.origin}/auth/callback?next=/onboarding` },
     });
