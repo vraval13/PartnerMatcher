@@ -9,13 +9,9 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
+        getAll() { return request.cookies.getAll(); },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
           supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
@@ -26,24 +22,43 @@ export async function middleware(request: NextRequest) {
   );
 
   // Refresh session — do NOT remove this
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const { data: { user } } = await supabase.auth.getUser();
   const { pathname } = request.nextUrl;
 
-  // Protect dashboard — redirect unauthenticated users to sign-in
-  if (!user && pathname.startsWith("/dashboard")) {
+  const isAuthPage = pathname === "/signin" || pathname === "/signup";
+  const isDashboard = pathname.startsWith("/dashboard");
+  const isOnboarding = pathname.startsWith("/onboarding");
+
+  // No user — protect dashboard + onboarding
+  if (!user && (isDashboard || isOnboarding)) {
     const url = request.nextUrl.clone();
     url.pathname = "/signin";
     return NextResponse.redirect(url);
   }
 
-  // Redirect already-authenticated users away from auth pages
-  if (user && (pathname === "/signin" || pathname === "/signup")) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+  // User exists — check onboarding state for relevant routes
+  if (user && (isDashboard || isAuthPage || isOnboarding)) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("university")
+      .eq("user_id", user.id)
+      .single();
+
+    const onboarded = !!profile?.university;
+
+    // Authenticated + not onboarded → send to /onboarding (unless already there)
+    if (!onboarded && !isOnboarding) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/onboarding";
+      return NextResponse.redirect(url);
+    }
+
+    // Authenticated + onboarded → send away from auth/onboarding pages
+    if (onboarded && (isAuthPage || isOnboarding)) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;
