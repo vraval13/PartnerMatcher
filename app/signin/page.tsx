@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -13,13 +13,18 @@ export default function SignInPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const supabase = createClient();
+  // Lazy — only initialised in the browser when a handler fires, never during prerender
+  const clientRef = useRef<ReturnType<typeof createClient> | null>(null);
+  const getSupabase = () => {
+    if (!clientRef.current) clientRef.current = createClient();
+    return clientRef.current;
+  };
 
   async function handleSignIn(e: React.SyntheticEvent) {
     e.preventDefault();
     setLoading(true);
     setError("");
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await getSupabase().auth.signInWithPassword({ email, password });
     if (error) {
       setError(error.message);
       setLoading(false);
@@ -32,7 +37,7 @@ export default function SignInPage() {
   async function handleOAuth(provider: "github" | "google") {
     setLoading(true);
     setError("");
-    const { error } = await supabase.auth.signInWithOAuth({
+    const { error } = await getSupabase().auth.signInWithOAuth({
       provider,
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
