@@ -133,7 +133,7 @@ export function OnboardingClient({ user }: { user: User }) {
     setError("");
     // Save profile fields from steps 1 + 2
     setLoading(true);
-    const { error } = await supabase
+    const { error } = await getSupabase()
       .from("profiles")
       .update({
         university: university.trim(),
@@ -166,7 +166,7 @@ export function OnboardingClient({ user }: { user: User }) {
 
     for (const c of validCourses) {
       // Upsert course into courses table
-      const { data: courseRow, error: courseErr } = await supabase
+      const { data: courseRow, error: courseErr } = await getSupabase()
         .from("courses")
         .upsert(
           { name: c.name.trim(), code: c.code.trim() || c.name.trim().slice(0, 10), university: university.trim() },
