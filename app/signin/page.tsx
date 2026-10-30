@@ -2,16 +2,22 @@
 
 import Link from "next/link";
 import { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 export default function SignInPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const callbackError = searchParams.get("error");
+  const [error, setError] = useState(
+    callbackError === "auth_callback_failed"
+      ? "Sign-in failed. Please try again."
+      : ""
+  );
 
   // Lazy — only initialised in the browser when a handler fires, never during prerender
   const clientRef = useRef<ReturnType<typeof createClient> | null>(null);

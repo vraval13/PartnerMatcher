@@ -201,16 +201,19 @@ export function OnboardingClient({ user }: { user: User }) {
         })
         .eq("user_id", user.id);
       setSaving(false);
-      if (saveErr) { setError(saveErr.message); return; }
+      if (saveErr) { setError("Failed to save your preferences. Please check your connection and try again."); return; }
     }
 
     navigate(qIdx + 1, 1);
   }
 
   // Auto-advance for single-tap selection questions
+  // Captures qIdx via closure at call time — safe because selection questions
+  // disable themselves while the timeout is in flight (no double-tap risk).
   function autoAdvance(setter: (v: string) => void, value: string) {
     setter(value);
-    setTimeout(() => navigate(qIdx + 1, 1), 320);
+    const capturedIdx = qIdx;
+    setTimeout(() => navigate(capturedIdx + 1, 1), 320);
   }
 
   async function handleFinish() {
@@ -219,11 +222,12 @@ export function OnboardingClient({ user }: { user: User }) {
     setError("");
     setLoading(true);
 
+    let savedCount = 0;
     for (const c of validCourses) {
       const { data: courseRow, error: courseErr } = await getSupabase()
         .from("courses")
         .upsert(
-          { name: c.name.trim(), code: c.code.trim() || c.name.trim().slice(0, 10), university: university.trim() },
+          { name: c.name.trim(), code: c.code.trim() || null, university: university.trim() },
           { onConflict: "code,university", ignoreDuplicates: false }
         )
         .select("id")
@@ -231,10 +235,18 @@ export function OnboardingClient({ user }: { user: User }) {
 
       if (courseErr || !courseRow) continue;
 
-      await getSupabase().from("user_courses").upsert(
+      const { error: ucErr } = await getSupabase().from("user_courses").upsert(
         { user_id: user.id, course_id: courseRow.id, goal: c.goal, semester: "Fall 2026" },
         { onConflict: "user_id,course_id,goal", ignoreDuplicates: true }
       );
+
+      if (!ucErr) savedCount++;
+    }
+
+    if (savedCount === 0) {
+      setError("Failed to save your courses. Please check your connection and try again.");
+      setLoading(false);
+      return;
     }
 
     router.push("/dashboard");
