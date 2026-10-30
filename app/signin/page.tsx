@@ -26,7 +26,11 @@ export default function SignInPage() {
     setError("");
     const { error } = await getSupabase().auth.signInWithPassword({ email, password });
     if (error) {
-      setError(error.message);
+      if (error.message.toLowerCase().includes("email not confirmed")) {
+        setError("Please confirm your email address before signing in. Check your inbox.");
+      } else {
+        setError("Credentials are incorrect. Please try again.");
+      }
       setLoading(false);
     } else {
       router.push("/dashboard");
