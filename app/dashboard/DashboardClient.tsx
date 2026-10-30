@@ -11,11 +11,6 @@ const stats = [
   { label: "Goals set",        value: "—",  icon: "🎯" },
 ];
 
-const suggestedPartners = [
-  { initials: "AK", name: "Aisha Khan",    course: "Data Structures",      bg: "#dbeafe", fg: "#1d4ed8" },
-  { initials: "MR", name: "Marco Rivera",  course: "Algorithms",            bg: "#fef3c7", fg: "#d97706" },
-  { initials: "SP", name: "Sara Park",     course: "Machine Learning",      bg: "#ede9fe", fg: "#7c3aed" },
-];
 
 export function DashboardClient({ user }: { user: User }) {
   const router = useRouter();
@@ -160,45 +155,24 @@ export function DashboardClient({ user }: { user: User }) {
             className="rounded-2xl border p-6 lg:col-span-2"
             style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-card)" }}
           >
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold" style={{ color: "var(--text-heading)" }}>Suggested partners</h2>
-              <span
-                className="rounded-full px-2.5 py-1 text-xs font-medium"
-                style={{ backgroundColor: "var(--bg-tag)", color: "var(--text-tag)" }}
+            <h2 className="mb-4 text-sm font-semibold" style={{ color: "var(--text-heading)" }}>Suggested partners</h2>
+
+            <div className="flex flex-col items-center justify-center py-10 text-center gap-3">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl text-2xl" style={{ backgroundColor: "var(--bg-row)" }}>
+                🔍
+              </div>
+              <p className="font-semibold text-sm" style={{ color: "var(--text-sub)" }}>No matches yet</p>
+              <p className="text-xs max-w-xs leading-5" style={{ color: "var(--text-muted)" }}>
+                Complete your profile and add your courses to start seeing study partners.
+              </p>
+              <Link
+                href="/onboarding"
+                className="mt-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all hover:-translate-y-px hover:shadow-md"
+                style={{ backgroundColor: "var(--btn-primary-bg)", color: "var(--btn-primary-fg)" }}
               >
-                Demo
-              </span>
+                Complete profile
+              </Link>
             </div>
-
-            <div className="space-y-3">
-              {suggestedPartners.map((p) => (
-                <div
-                  key={p.initials}
-                  className="flex items-center gap-4 rounded-xl border p-3.5 transition-all hover:-translate-y-px hover:shadow-sm cursor-pointer"
-                  style={{ backgroundColor: "var(--bg-row)", borderColor: "var(--border-row)" }}
-                >
-                  <div
-                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold"
-                    style={{ backgroundColor: p.bg, color: p.fg }}
-                  >
-                    {p.initials}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm" style={{ color: "var(--text-sub)" }}>{p.name}</p>
-                    <p className="text-xs mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>{p.course}</p>
-                  </div>
-                  <button className="flex-shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all hover:shadow-sm"
-                    style={{ backgroundColor: "var(--bg-btn-outline)", borderColor: "var(--border-btn-outline)", color: "var(--text-btn-outline)" }}
-                  >
-                    Connect
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <p className="mt-4 text-center text-xs" style={{ color: "var(--text-muted)" }}>
-              Set your learning goals to see real matches →
-            </p>
           </div>
         </div>
 

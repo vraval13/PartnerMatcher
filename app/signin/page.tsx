@@ -1,17 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-export default function SignInPage() {
+function SignInForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const callbackError = searchParams.get("error");
+  const [error, setError] = useState(
+    callbackError === "auth_callback_failed"
+      ? "Sign-in failed. Please try again."
+      : ""
+  );
 
   // Lazy — only initialised in the browser when a handler fires, never during prerender
   const clientRef = useRef<ReturnType<typeof createClient> | null>(null);
@@ -26,7 +32,11 @@ export default function SignInPage() {
     setError("");
     const { error } = await getSupabase().auth.signInWithPassword({ email, password });
     if (error) {
-      setError(error.message);
+      if (error.message.toLowerCase().includes("email not confirmed")) {
+        setError("Please confirm your email address before signing in. Check your inbox.");
+      } else {
+        setError("Credentials are incorrect. Please try again.");
+      }
       setLoading(false);
     } else {
       router.push("/dashboard");
@@ -247,5 +257,13 @@ export default function SignInPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense>
+      <SignInForm />
+    </Suspense>
   );
 }

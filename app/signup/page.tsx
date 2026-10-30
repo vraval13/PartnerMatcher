@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 const LeftPanel = () => (
@@ -78,10 +77,7 @@ const LeftPanel = () => (
   </div>
 );
 
-const REQUIRE_CONFIRM = process.env.NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRM === "true";
-
 export default function SignUpPage() {
-  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -101,37 +97,13 @@ export default function SignUpPage() {
     setLoading(true);
     setError("");
 
-    if (!REQUIRE_CONFIRM) {
-      // ── Admin path: create user server-side (no email sent) ──
-      const res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
-      });
-
-      const body = await res.json();
-
-      if (!res.ok) {
-        setError(body.error ?? "Something went wrong.");
-        setLoading(false);
-        return;
-      }
-
-      // User created and pre-confirmed — sign in immediately
-      const { error: signInErr } = await getSupabase().auth.signInWithPassword({ email, password });
-      if (signInErr) {
-        setError(signInErr.message);
-        setLoading(false);
-        return;
-      }
-
-      router.push("/onboarding");
-      router.refresh();
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      setLoading(false);
       return;
     }
 
-    // ── Standard path: signUp() + confirmation email ──
-    const { error } = await getSupabase().auth.signUp({
+    const { data, error } = await getSupabase().auth.signUp({
       email,
       password,
       options: {
@@ -141,7 +113,14 @@ export default function SignUpPage() {
     });
 
     if (error) {
-      setError(error.message);
+      setError("Something went wrong. Please try again.");
+      setLoading(false);
+      return;
+    }
+
+    // Supabase returns a user with empty identities when the email already exists
+    if (data.user?.identities?.length === 0) {
+      setError("An account with this email already exists. Please sign in.");
       setLoading(false);
       return;
     }
