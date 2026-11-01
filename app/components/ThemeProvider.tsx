@@ -21,8 +21,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       ? "dark"
       : "light";
     const initial = stored ?? preferred;
-    setTheme(initial);
+    const frame = requestAnimationFrame(() => setTheme(initial));
     document.documentElement.classList.toggle("dark", initial === "dark");
+    return () => cancelAnimationFrame(frame);
   }, []);
 
   const toggle = () => {

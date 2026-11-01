@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
+import { saveCourses } from "@/lib/onboarding/courses";
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -222,35 +223,15 @@ export function OnboardingClient({ user }: { user: User }) {
     setError("");
     setLoading(true);
 
-    let savedCount = 0;
-    for (const c of validCourses) {
-      const { data: courseRow, error: courseErr } = await getSupabase()
-        .from("courses")
-        .upsert(
-          { name: c.name.trim(), code: c.code.trim() || null, university: university.trim() },
-          { onConflict: "code,university", ignoreDuplicates: false }
-        )
-        .select("id")
-        .single();
-
-      if (courseErr || !courseRow) continue;
-
-      const { error: ucErr } = await getSupabase().from("user_courses").upsert(
-        { user_id: user.id, course_id: courseRow.id, goal: c.goal, semester: "Fall 2026" },
-        { onConflict: "user_id,course_id,goal", ignoreDuplicates: true }
-      );
-
-      if (!ucErr) savedCount++;
-    }
-
-    if (savedCount === 0) {
-      setError("Failed to save your courses. Please check your connection and try again.");
+    try {
+      await saveCourses(getSupabase(), user.id, university, validCourses);
+      router.push("/dashboard");
+      router.refresh();
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Unable to save courses. Please try again.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    router.push("/dashboard");
-    router.refresh();
   }
 
   // ── Render ──────────────────────────────────────────────────────────────
