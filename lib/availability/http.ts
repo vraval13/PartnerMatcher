@@ -10,6 +10,7 @@ import { validateWeeklyAvailability } from "./validation";
 
 const availabilitySelection =
   "id,goal_id,weekday,start_time,end_time,timezone,created_at,updated_at";
+const maximumSlotsPerGoal = 21;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type ApiErrorCode =
@@ -20,6 +21,7 @@ type ApiErrorCode =
   | "goal_not_found"
   | "slot_not_found"
   | "duplicate_slot"
+  | "slot_limit_reached"
   | "unauthorized"
   | "storage_unavailable";
 
@@ -206,6 +208,13 @@ export async function createAvailability(db: SupabaseClient, goalId: string, req
     await requireOwnedGoal(db, goalId, userId);
     const body = await parseBody(request);
     const existingRows = await slotsForGoal(db, goalId);
+    if (existingRows.length >= maximumSlotsPerGoal) {
+      throw new AvailabilityApiError(
+        "slot_limit_reached",
+        409,
+        "A learning goal can have at most 21 availability slots."
+      );
+    }
     const validated = validationFailure(
       runtimeInput(body),
       existingRows.map(fromAvailabilityDatabaseFields)

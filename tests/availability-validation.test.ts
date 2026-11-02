@@ -71,6 +71,30 @@ test("rejects an invalid IANA timezone", () => {
   assert.ok(errorCodes({ ...validSlot, timezone: "Not/A_Timezone" }).includes("invalid_timezone"));
 });
 
+test("accepts a supported IANA timezone", () => {
+  const result = validateWeeklyAvailability({
+    ...validSlot,
+    timezone: "America/New_York",
+  });
+
+  assert.equal(result.valid, true);
+});
+
+test("rejects fixed offsets with a timezone field error", () => {
+  for (const timezone of ["+01:00", "-05:00"]) {
+    const result = validateWeeklyAvailability({ ...validSlot, timezone });
+
+    assert.equal(result.valid, false);
+    if (!result.valid) {
+      assert.ok(
+        result.errors.some(
+          (error) => error.code === "invalid_timezone" && error.field === "timezone"
+        )
+      );
+    }
+  }
+});
+
 test("detects a completely duplicate availability window", () => {
   assert.equal(isDuplicateAvailabilitySlot(validSlot, [validSlot]), true);
 

@@ -7,6 +7,7 @@ import type {
 } from "./types";
 
 const TIME_24_HOUR_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+const FIXED_OFFSET_TIMEZONE_PATTERN = /^[+-](?:[01]\d|2[0-3]):[0-5]\d$/;
 
 export function isDayOfWeek(value: number): value is DayOfWeek {
   return Number.isInteger(value) && value >= 0 && value <= 6;
@@ -18,7 +19,7 @@ export function isValid24HourTime(value: string): boolean {
 
 export function isValidIanaTimezone(value: string): boolean {
   const timezone = value.trim();
-  if (!timezone) return false;
+  if (!timezone || FIXED_OFFSET_TIMEZONE_PATTERN.test(timezone)) return false;
 
   if (typeof Intl === "undefined" || typeof Intl.DateTimeFormat !== "function") {
     return true;
@@ -127,7 +128,7 @@ export function validateWeeklyAvailability(
     errors.push({
       code: "invalid_timezone",
       field: "timezone",
-      message: "Timezone must be a valid IANA timezone.",
+      message: "Timezone must be a supported IANA timezone such as America/New_York.",
     });
   }
 

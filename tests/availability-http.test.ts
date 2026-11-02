@@ -33,13 +33,36 @@ const initialSlot: AvailabilityDatabaseRow = {
   updated_at: timestamp,
 };
 
+function availabilityRows(count: number): AvailabilityDatabaseRow[] {
+  return Array.from({ length: count }, (_, index) => {
+    const hour = Math.floor(index / 7);
+    const hourText = String(hour).padStart(2, "0");
+    return {
+      id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+      goal_id: goalId,
+      weekday: index % 7,
+      start_time: `${hourText}:00:00`,
+      end_time: `${hourText}:30:00`,
+      timezone: "America/New_York",
+      created_at: timestamp,
+      updated_at: timestamp,
+    };
+  });
+}
+
 type DatabaseState = {
   slots: AvailabilityDatabaseRow[];
   writes: number;
 };
 
-function database(userId: string | null = alice) {
-  const state: DatabaseState = { slots: [{ ...initialSlot }], writes: 0 };
+function database(
+  userId: string | null = alice,
+  initialSlots: readonly AvailabilityDatabaseRow[] = [initialSlot]
+) {
+  const state: DatabaseState = {
+    slots: initialSlots.map((slot) => ({ ...slot })),
+    writes: 0,
+  };
   type Result = { data: unknown; error: unknown };
   class Query {
     private operation: "select" | "insert" | "update" | "delete" = "select";
@@ -210,6 +233,28 @@ test("owner can add a valid slot and partial overlap is allowed", async () => {
   assert.equal(state.writes, 1);
 });
 
+test("creation is allowed when a goal currently has 20 slots", async () => {
+  const { client, state } = database(alice, availabilityRows(20));
+  const response = await createAvailability(client, goalId, request("POST", validInput));
+
+  assert.equal(response.status, 201);
+  assert.equal(state.slots.length, 21);
+  assert.equal(state.writes, 1);
+});
+
+test("creation is rejected at 21 slots without changing existing records", async () => {
+  const { client, state } = database(alice, availabilityRows(21));
+  const before = state.slots.map((slot) => ({ ...slot }));
+  const response = await createAvailability(client, goalId, request("POST", validInput));
+  const body = await response.json();
+
+  assert.equal(response.status, 409);
+  assert.equal(body.code, "slot_limit_reached");
+  assert.equal(body.error, "A learning goal can have at most 21 availability slots.");
+  assert.deepEqual(state.slots, before);
+  assert.equal(state.writes, 0);
+});
+
 test("owner can update their own slot", async () => {
   const { client, state } = database();
   const response = await updateAvailability(
@@ -272,6 +317,28 @@ test("equal or cross-midnight time ranges are rejected", async () => {
     const { client, state } = database();
     const response = await createAvailability(client, goalId, request("POST", input));
     assert.equal(response.status, 400);
+    assert.equal(state.writes, 0);
+  }
+});
+
+test("fixed-offset timezones return a field-level validation error", async () => {
+  for (const timezone of ["+01:00", "-05:00"]) {
+    const { client, state } = database();
+    const response = await createAvailability(
+      client,
+      goalId,
+      request("POST", { ...validInput, timezone })
+    );
+    const body = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(body.code, "invalid_request");
+    assert.ok(
+      body.errors.some(
+        (error: { code: string; field: string }) =>
+          error.code === "invalid_timezone" && error.field === "timezone"
+      )
+    );
     assert.equal(state.writes, 0);
   }
 });
