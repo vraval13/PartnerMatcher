@@ -23,15 +23,7 @@ type Course = {
   semester: string;
 };
 
-const years = [
-  "1st year",
-  "2nd year",
-  "3rd year",
-  "4th year",
-  "5th year",
-  "Graduate",
-  "PhD",
-];
+const years = ["1st year", "2nd year", "3rd year", "4th year", "5th year", "Graduate", "PhD"];
 
 const studyStyles = ["visual", "auditory", "reading", "kinesthetic", "mixed"];
 const communicationPrefs = ["video", "chat", "in_person", "mixed"];
@@ -39,8 +31,7 @@ const communicationPrefs = ["video", "chat", "in_person", "mixed"];
 const fieldClass =
   "mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-500 dark:focus:ring-indigo-500/10";
 
-const labelClass =
-  "block text-sm font-medium text-slate-700 dark:text-slate-300";
+const labelClass = "block text-sm font-medium text-slate-700 dark:text-slate-300";
 
 export function ProfileClient({
   user,
@@ -66,19 +57,11 @@ export function ProfileClient({
   const [university, setUniversity] = useState(profile?.university ?? "");
   const [major, setMajor] = useState(profile?.major ?? "");
   const [year, setYear] = useState(
-    profile?.year_of_study
-      ? years[profile.year_of_study - 1] ?? "Graduate"
-      : "Graduate"
+    profile?.year_of_study ? (years[profile.year_of_study - 1] ?? "Graduate") : "Graduate"
   );
-  const [studyStyle, setStudyStyle] = useState(
-    profile?.study_style ?? "mixed"
-  );
-  const [commPref, setCommPref] = useState(
-    profile?.comm_pref ?? "mixed"
-  );
-  const [timezone, setTimezone] = useState(
-    profile?.timezone ?? "America/New_York"
-  );
+  const [studyStyle, setStudyStyle] = useState(profile?.study_style ?? "mixed");
+  const [commPref, setCommPref] = useState(profile?.comm_pref ?? "mixed");
+  const [timezone, setTimezone] = useState(profile?.timezone ?? "America/New_York");
 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -183,12 +166,8 @@ export function ProfileClient({
             <button
               type="button"
               onClick={toggle}
-              aria-label={
-                theme === "light" ? "Switch to dark mode" : "Switch to light mode"
-              }
-              title={
-                theme === "light" ? "Switch to dark mode" : "Switch to light mode"
-              }
+              aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+              title={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
               className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               {theme === "light" ? (
@@ -240,8 +219,8 @@ export function ProfileClient({
           </h1>
 
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
-            Manage your personal information, academic background, and study
-            preferences to find compatible study partners.
+            Manage your personal information, academic background, and study preferences to find
+            compatible study partners.
           </p>
         </div>
 
@@ -256,9 +235,7 @@ export function ProfileClient({
                   {initials}
                 </div>
 
-                <h2 className="mt-4 text-lg font-bold text-slate-900 dark:text-white">
-                  {display}
-                </h2>
+                <h2 className="mt-4 text-lg font-bold text-slate-900 dark:text-white">{display}</h2>
 
                 <p className="mt-1 break-all text-sm text-slate-500 dark:text-slate-400">
                   {user.email}
@@ -325,14 +302,11 @@ export function ProfileClient({
             </section>
 
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#111119]">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Profile tip
-              </h3>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Profile tip</h3>
 
               <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                Keep your academic details and study preferences updated.
-                This information helps other students find compatible study
-                partners.
+                Keep your academic details and study preferences updated. This information helps
+                other students find compatible study partners.
               </p>
             </section>
           </aside>
@@ -358,7 +332,6 @@ export function ProfileClient({
               <div className="grid gap-5 sm:grid-cols-2">
                 <label className={labelClass}>
                   Full name
-
                   <input
                     required
                     maxLength={100}
@@ -371,13 +344,11 @@ export function ProfileClient({
 
                 <label className={labelClass}>
                   Email address
-
                   <input
                     readOnly
                     value={user.email ?? ""}
                     className={`${fieldClass} cursor-not-allowed bg-slate-50 text-slate-500 dark:bg-slate-800 dark:text-slate-400`}
                   />
-
                   <span className="mt-2 block text-xs font-normal text-slate-400">
                     Managed by your sign-in account.
                   </span>
@@ -404,7 +375,6 @@ export function ProfileClient({
               <div className="grid gap-5 sm:grid-cols-2">
                 <label className={labelClass}>
                   University
-
                   <input
                     required
                     maxLength={160}
@@ -417,7 +387,6 @@ export function ProfileClient({
 
                 <label className={labelClass}>
                   Major / Programme
-
                   <input
                     required
                     maxLength={120}
@@ -430,7 +399,6 @@ export function ProfileClient({
 
                 <label className={labelClass}>
                   Year of study
-
                   <select
                     value={year}
                     onChange={(e) => setYear(e.target.value)}
@@ -444,7 +412,6 @@ export function ProfileClient({
 
                 <label className={labelClass}>
                   Time zone
-
                   <select
                     value={timezone}
                     onChange={(e) => setTimezone(e.target.value)}
@@ -477,7 +444,6 @@ export function ProfileClient({
               <div className="grid gap-5 sm:grid-cols-2">
                 <label className={labelClass}>
                   Preferred study style
-
                   <select
                     value={studyStyle}
                     onChange={(e) => setStudyStyle(e.target.value)}
@@ -493,7 +459,6 @@ export function ProfileClient({
 
                 <label className={labelClass}>
                   Communication preference
-
                   <select
                     value={commPref}
                     onChange={(e) => setCommPref(e.target.value)}
@@ -556,8 +521,8 @@ export function ProfileClient({
                   </p>
 
                   <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                    Add your courses through the course management page to
-                    improve partner suggestions.
+                    Add your courses through the course management page to improve partner
+                    suggestions.
                   </p>
                 </div>
               )}

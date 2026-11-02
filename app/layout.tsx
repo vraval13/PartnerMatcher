@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { PropsWithChildren } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "./components/ThemeProvider";
@@ -19,12 +20,9 @@ export const metadata: Metadata = {
     "Discover compatible study partners based on your courses, learning goals, and availability. Make every study session more meaningful.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: PropsWithChildren) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         <ThemeProvider>{children}</ThemeProvider>
       </body>

@@ -6,13 +6,13 @@ Welcome to PartnerMatcher. This guide covers everything you need to open a good 
 
 ## Branch Strategy
 
-| Branch | Purpose |
-|---|---|
-| `main` | Production-ready code. Protected — no direct pushes. |
-| `vraval` | Primary development branch for the core team |
-| `feature/<name>` | New features (`feature/signup-page`) |
-| `fix/<name>` | Bug fixes (`fix/dark-mode-flicker`) |
-| `chore/<name>` | Tooling, docs, refactors (`chore/update-deps`) |
+| Branch           | Purpose                                              |
+| ---------------- | ---------------------------------------------------- |
+| `main`           | Production-ready code. Protected — no direct pushes. |
+| `vraval`         | Primary development branch for the core team         |
+| `feature/<name>` | New features (`feature/signup-page`)                 |
+| `fix/<name>`     | Bug fixes (`fix/dark-mode-flicker`)                  |
+| `chore/<name>`   | Tooling, docs, refactors (`chore/update-deps`)       |
 
 ### Workflow
 
@@ -36,17 +36,18 @@ git push -u origin feature/your-feature
 
 Format: `<type>: <short summary in present tense>`
 
-| Type | When to use |
-|---|---|
-| `feat` | New feature or page |
-| `fix` | Bug fix |
-| `style` | CSS/styling changes only (no logic change) |
-| `refactor` | Code restructure without behaviour change |
-| `chore` | Deps, tooling, config, docs updates |
-| `test` | Adding or updating tests |
-| `perf` | Performance improvement |
+| Type       | When to use                                |
+| ---------- | ------------------------------------------ |
+| `feat`     | New feature or page                        |
+| `fix`      | Bug fix                                    |
+| `style`    | CSS/styling changes only (no logic change) |
+| `refactor` | Code restructure without behaviour change  |
+| `chore`    | Deps, tooling, config, docs updates        |
+| `test`     | Adding or updating tests                   |
+| `perf`     | Performance improvement                    |
 
 Examples:
+
 ```
 feat: add two-column sign-in page with GitHub OAuth button
 fix: prevent new Date() during static prerender in footer
@@ -55,6 +56,7 @@ chore: add database schema to docs/database.md
 ```
 
 When working with Claude Code, end every commit message with:
+
 ```
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 ```
@@ -87,6 +89,7 @@ Before opening a PR, confirm:
 ## Frontend Code Conventions
 
 ### File naming
+
 - Page files: `app/<route>/page.tsx`
 - Shared components: `app/components/ComponentName.tsx` (PascalCase)
 - Client components get `"use client"` as the **first line** of the file
@@ -108,13 +111,19 @@ const { data, error } = await getSupabase().auth.signUp({ ... });
 ```
 
 `useSearchParams()` **must** be inside a `<Suspense>` boundary — wrap the component:
+
 ```tsx
 export default function MyPage() {
-  return <Suspense><MyForm /></Suspense>;
+  return (
+    <Suspense>
+      <MyForm />
+    </Suspense>
+  );
 }
 ```
 
 ### Component structure
+
 ```tsx
 // 1. "use client" if needed
 // 2. imports (React, Next.js, then local)
@@ -125,6 +134,7 @@ export default function MyPage() {
 ```
 
 ### Styling order of preference
+
 1. Tailwind utility classes for layout, spacing, typography
 2. CSS custom property via `style={{ ... }}` for colours and theme-aware values
 3. Tailwind arbitrary values `bg-[var(--bg-card)]` when Tailwind class composition is needed
@@ -132,12 +142,14 @@ export default function MyPage() {
 5. Never: hardcoded hex/rgb colours in JSX
 
 ### Adding a new animation
+
 1. Add `@keyframes your-anim { ... }` to `globals.css`
 2. Add a utility class `.anim-your-anim { animation: your-anim ... }` to `globals.css`
 3. Apply the class in JSX: `<div className="anim-your-anim">`
 4. Never put `@keyframes` inside a component file
 
 ### Adding a new colour token
+
 ```css
 /* In globals.css */
 :root {
@@ -149,6 +161,7 @@ export default function MyPage() {
   --border-new-surface: rgba(30, 41, 59, 0.85);
 }
 ```
+
 Then use: `style={{ backgroundColor: "var(--bg-new-surface)" }}`
 
 ---
@@ -171,6 +184,7 @@ Then use: `style={{ backgroundColor: "var(--bg-new-surface)" }}`
 ## Reviewing PRs
 
 When reviewing:
+
 1. Check the PR description explains **what** changed and **why**
 2. Pull the branch and `npm run build` locally — don't approve a failing build
 3. Test the dark mode toggle
@@ -180,4 +194,4 @@ When reviewing:
 
 ---
 
-*Last updated: 2026-11-01 (Sprint 4 — auth/onboarding checklist items added).*
+_Last updated: 2026-11-01 (Sprint 4 — auth/onboarding checklist items added)._

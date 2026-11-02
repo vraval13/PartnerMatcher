@@ -90,7 +90,6 @@ export default function Home() {
 
       {/* ── Hero ─────────────────────────────────────────────── */}
       <section className="relative flex flex-col items-center overflow-hidden px-6 pb-28 pt-36 text-center lg:pb-36 lg:pt-44">
-
         {/* Animated ambient orbs */}
         <div
           className="orb-1 pointer-events-none absolute -top-40 left-1/2 h-[580px] w-[780px] rounded-full opacity-50"
@@ -116,7 +115,7 @@ export default function Home() {
           {[
             { top: "18%", left: "12%", d: "2.5s" },
             { top: "32%", left: "88%", d: "3.2s" },
-            { top: "60%", left: "6%",  d: "2.8s" },
+            { top: "60%", left: "6%", d: "2.8s" },
             { top: "72%", left: "92%", d: "3.6s" },
             { top: "12%", left: "70%", d: "4.1s" },
             { top: "84%", left: "55%", d: "2.4s" },
@@ -157,8 +156,7 @@ export default function Home() {
           className="anim-hero-1 relative mx-auto max-w-3xl text-5xl font-bold leading-[1.1] tracking-tight sm:text-6xl lg:text-7xl"
           style={{ color: "var(--text-heading)" }}
         >
-          Find your perfect{" "}
-          <br className="hidden sm:block" />
+          Find your perfect <br className="hidden sm:block" />
           <span className="gradient-text-animated">study partner</span>
         </h1>
 
@@ -166,8 +164,8 @@ export default function Home() {
           className="anim-hero-2 relative mx-auto mt-6 max-w-xl text-lg leading-8"
           style={{ color: "var(--text-muted)" }}
         >
-          Discover compatible study partners based on your courses, learning
-          goals, and availability. Make every study session more meaningful.
+          Discover compatible study partners based on your courses, learning goals, and
+          availability. Make every study session more meaningful.
         </p>
 
         {/* CTA buttons */}
@@ -200,22 +198,20 @@ export default function Home() {
           className="anim-hero-4 relative mt-10 flex flex-wrap justify-center gap-5 text-sm"
           style={{ color: "var(--text-muted)" }}
         >
-          {["Goal-based matching", "Flexible availability", "Student-focused"].map(
-            (label) => (
-              <span key={label} className="flex items-center gap-1.5">
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  className="text-emerald-500"
-                >
-                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                </svg>
-                {label}
-              </span>
-            )
-          )}
+          {["Goal-based matching", "Flexible availability", "Student-focused"].map((label) => (
+            <span key={label} className="flex items-center gap-1.5">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                className="text-emerald-500"
+              >
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+              </svg>
+              {label}
+            </span>
+          ))}
         </div>
 
         {/* ── Hero preview card (3D) ──────────────────────────── */}
@@ -242,10 +238,7 @@ export default function Home() {
                 >
                   Your Matching Space
                 </p>
-                <h2
-                  className="mt-1 text-xl font-bold"
-                  style={{ color: "var(--text-heading)" }}
-                >
+                <h2 className="mt-1 text-xl font-bold" style={{ color: "var(--text-heading)" }}>
                   Find your next partner
                 </h2>
               </div>
@@ -291,10 +284,7 @@ export default function Home() {
             </div>
 
             {/* Card footer */}
-            <p
-              className="mt-5 text-center text-sm"
-              style={{ color: "var(--text-muted)" }}
-            >
+            <p className="mt-5 text-center text-sm" style={{ color: "var(--text-muted)" }}>
               Your goals. Your schedule. Your learning community.
             </p>
           </div>
@@ -304,10 +294,7 @@ export default function Home() {
       {/* ── Features ─────────────────────────────────────────── */}
       <section id="features" className="py-28">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
-          <div
-            className="mx-auto max-w-2xl text-center"
-            data-animate="fade-up"
-          >
+          <div className="mx-auto max-w-2xl text-center" data-animate="fade-up">
             <p className="text-xs font-bold uppercase tracking-widest text-indigo-500">
               Find your match
             </p>
@@ -318,16 +305,11 @@ export default function Home() {
               One platform, every learning goal
             </h2>
             <p className="mt-4 leading-7" style={{ color: "var(--text-muted)" }}>
-              Whatever you want to learn, connect with students working toward
-              similar goals.
+              Whatever you want to learn, connect with students working toward similar goals.
             </p>
           </div>
 
-          <div
-            className="mt-12 grid gap-5 md:grid-cols-3"
-            id="partner-types"
-            data-animate-stagger
-          >
+          <div className="mt-12 grid gap-5 md:grid-cols-3" id="partner-types" data-animate-stagger>
             {features.map((f) => (
               <article
                 key={f.number}
@@ -353,16 +335,10 @@ export default function Home() {
                   </span>
                 </div>
 
-                <h3
-                  className="mt-6 text-xl font-bold"
-                  style={{ color: "var(--text-heading)" }}
-                >
+                <h3 className="mt-6 text-xl font-bold" style={{ color: "var(--text-heading)" }}>
                   {f.title}
                 </h3>
-                <p
-                  className="mt-3 min-h-[5rem] leading-7"
-                  style={{ color: "var(--text-muted)" }}
-                >
+                <p className="mt-3 min-h-[5rem] leading-7" style={{ color: "var(--text-muted)" }}>
                   {f.description}
                 </p>
 
@@ -402,10 +378,7 @@ export default function Home() {
           </div>
 
           {/* Steps with connector line */}
-          <div
-            className="mt-14 grid gap-5 md:grid-cols-3"
-            data-animate-stagger
-          >
+          <div className="mt-14 grid gap-5 md:grid-cols-3" data-animate-stagger>
             {steps.map((item, idx) => (
               <div
                 key={item.step}
@@ -433,10 +406,7 @@ export default function Home() {
                     Step {item.step}
                   </span>
                 </div>
-                <h3
-                  className="mt-4 text-xl font-bold"
-                  style={{ color: "var(--text-heading)" }}
-                >
+                <h3 className="mt-4 text-xl font-bold" style={{ color: "var(--text-heading)" }}>
                   {item.title}
                 </h3>
                 <p className="mt-3 leading-7" style={{ color: "var(--text-muted)" }}>
@@ -459,15 +429,12 @@ export default function Home() {
               <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-500/20 text-2xl">
                 🚀
               </div>
-              <h2
-                className="text-3xl font-bold"
-                style={{ color: "var(--text-cta)" }}
-              >
+              <h2 className="text-3xl font-bold" style={{ color: "var(--text-cta)" }}>
                 Learning is better together.
               </h2>
               <p className="mx-auto mt-4 max-w-xl leading-7 text-slate-400">
-                Start by defining your learning goals and discover students who
-                can help you reach them.
+                Start by defining your learning goals and discover students who can help you reach
+                them.
               </p>
               <Link
                 href="/signup"

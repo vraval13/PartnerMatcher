@@ -1,0 +1,11 @@
+node_modules
+.next
+out
+build
+dist
+bun.lock
+package-lock.json
+
+test-results
+supabase/.temp
+supabase/.branches
