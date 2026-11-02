@@ -479,15 +479,15 @@ export function DashboardClient({
               </div>
               <p className="font-semibold text-sm" style={{ color: "var(--text-sub)" }}>No matches yet</p>
               <p className="text-xs max-w-xs leading-5" style={{ color: "var(--text-muted)" }}>
-                Complete your profile and add your courses to start seeing study partners.
+                Add a course or assignment goal and your availability to find compatible study partners.
               </p>
 
               <Link
-                href="/onboarding"
+                href="/partners"
                 className="mt-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all hover:-translate-y-px hover:shadow-md"
                 style={{ backgroundColor: "var(--btn-primary-bg)", color: "var(--btn-primary-fg)" }}
               >
-                Complete profile
+                Find partners
               </Link>
             </div>
           </div>
@@ -517,6 +517,11 @@ export function DashboardClient({
           ].map((action) => (
             <button
               key={action.title}
+              onClick={() => {
+                if (action.title === "Set goals" || action.title === "Browse partners") {
+                  router.push("/partners");
+                }
+              }}
               className="rounded-2xl border p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
               style={{ backgroundColor: "var(--bg-step)", borderColor: "var(--border-step)" }}
             >
