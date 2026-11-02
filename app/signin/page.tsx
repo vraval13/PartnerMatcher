@@ -41,6 +41,7 @@ function SignInForm() {
     } else {
       router.push("/dashboard");
       router.refresh();
+      setLoading(false);
     }
   }
 

@@ -92,6 +92,8 @@ export default function SignUpPage() {
     return clientRef.current;
   };
 
+  const requireConfirm = process.env.NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRM !== "false";
+
   async function handleSignUp(e: React.SyntheticEvent) {
     e.preventDefault();
     setLoading(true);
@@ -103,6 +105,40 @@ export default function SignUpPage() {
       return;
     }
 
+    // ── Dev mode: skip email confirmation ────────────────────────────────────
+    if (!requireConfirm) {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password }),
+      });
+      const json = await res.json();
+
+      if (!res.ok) {
+        setError(
+          res.status === 409
+            ? "An account with this email already exists. Please sign in."
+            : "Something went wrong. Please try again."
+        );
+        setLoading(false);
+        return;
+      }
+
+      // Pre-confirmed — sign in immediately and go straight to onboarding
+      const { error: signInErr } = await getSupabase().auth.signInWithPassword({ email, password });
+      if (signInErr) {
+        setError("Account created but sign-in failed. Please go to the sign-in page.");
+        setLoading(false);
+        return;
+      }
+
+      // Suppress unused variable warning
+      void json;
+      window.location.href = "/onboarding";
+      return;
+    }
+
+    // ── Production: email confirmation flow ──────────────────────────────────
     const { data, error } = await getSupabase().auth.signUp({
       email,
       password,

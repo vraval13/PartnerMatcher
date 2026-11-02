@@ -15,11 +15,11 @@ export default async function OnboardingPage() {
   // If already onboarded, skip to dashboard
   const { data: profile } = await supabase
     .from("profiles")
-    .select("university")
+    .select("onboarded_at")
     .eq("user_id", user.id)
     .single();
 
-  if (profile?.university) redirect("/dashboard");
+  if (profile?.onboarded_at) redirect("/dashboard");
 
   return <OnboardingClient user={user} />;
 }

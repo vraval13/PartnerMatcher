@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
-import { saveCourses } from "@/lib/onboarding/courses";
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -32,6 +31,14 @@ const COURSE_GOALS = [
 ] as const;
 
 const YEARS = ["1st year", "2nd year", "3rd year", "4th year", "5th year", "Graduate", "PhD"];
+
+function currentSemester(): string {
+  const m = new Date().getMonth() + 1;
+  const y = new Date().getFullYear();
+  if (m <= 5) return `Spring ${y}`;
+  if (m <= 7) return `Summer ${y}`;
+  return `Fall ${y}`;
+}
 
 const TIMEZONES = [
   "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
@@ -199,6 +206,7 @@ export function OnboardingClient({ user }: { user: User }) {
           study_style:   studyStyle,
           comm_pref:     commPref,
           timezone,
+          onboarded_at:  new Date().toISOString(),
         })
         .eq("user_id", user.id);
       setSaving(false);
@@ -223,15 +231,59 @@ export function OnboardingClient({ user }: { user: User }) {
     setError("");
     setLoading(true);
 
-    try {
-      await saveCourses(getSupabase(), user.id, university, validCourses);
-      router.push("/dashboard");
-      router.refresh();
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Unable to save courses. Please try again.");
-    } finally {
-      setLoading(false);
+    let savedCount = 0;
+    for (const c of validCourses) {
+      const code = c.code.trim() || null;
+      const name = c.name.trim();
+      const uni  = university.trim();
+
+      let courseId: string | null = null;
+
+      if (code) {
+        // upsert on the partial unique index (code, university) then re-read on conflict
+        const { data: upserted, error: upErr } = await getSupabase()
+          .from("courses")
+          .upsert({ name, code, university: uni }, { onConflict: "code,university", ignoreDuplicates: true })
+          .select("id")
+          .maybeSingle();
+        if (upErr || !upserted) {
+          const { data: existing } = await getSupabase()
+            .from("courses").select("id").eq("code", code).eq("university", uni).maybeSingle();
+          courseId = existing?.id ?? null;
+        } else {
+          courseId = upserted.id;
+        }
+      } else {
+        // NULL code: match by name + university to avoid duplicates
+        const { data: existing } = await getSupabase()
+          .from("courses").select("id").ilike("name", name).ilike("university", uni).maybeSingle();
+        if (existing) {
+          courseId = existing.id;
+        } else {
+          const { data: inserted } = await getSupabase()
+            .from("courses").insert({ name, code: null, university: uni }).select("id").maybeSingle();
+          courseId = inserted?.id ?? null;
+        }
+      }
+
+      if (!courseId) continue;
+
+      const { error: ucErr } = await getSupabase().from("user_courses").upsert(
+        { user_id: user.id, course_id: courseId, goal: c.goal, semester: currentSemester() },
+        { onConflict: "user_id,course_id,goal", ignoreDuplicates: true }
+      );
+      if (!ucErr) savedCount++;
     }
+
+    if (savedCount === 0) {
+      setError("Failed to save your courses. Please check your connection and try again.");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(false);
+    router.push("/dashboard");
+    router.refresh();
   }
 
   // ── Render ──────────────────────────────────────────────────────────────
