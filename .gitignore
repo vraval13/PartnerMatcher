@@ -34,3 +34,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+
+# Local verification and Supabase CLI state
+test-results/
+supabase/.temp/
+supabase/.branches/

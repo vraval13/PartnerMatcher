@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
@@ -16,28 +15,12 @@ type ProfileSummary = {
   timezone: string | null;
 };
 
-const yearLabels = [
-  "1st year",
-  "2nd year",
-  "3rd year",
-  "4th year",
-  "5th year",
-  "Graduate",
-  "PhD",
-];
+const yearLabels = ["1st year", "2nd year", "3rd year", "4th year", "5th year", "Graduate", "PhD"];
 
 const readable = (value: string | null | undefined) =>
-  value
-    ? value.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase())
-    : "Not set";
+  value ? value.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase()) : "Not set";
 
-function Icon({
-  name,
-  size = 20,
-}: {
-  name: string;
-  size?: number;
-}) {
+function Icon({ name, size = 20 }: { name: string; size?: number }) {
   const common = {
     width: size,
     height: size,
@@ -120,11 +103,7 @@ export function DashboardClient({
   courseCount: number;
 }) {
   const router = useRouter();
-  const clientRef = useRef<ReturnType<typeof createClient> | null>(null);
-  const getSupabase = () => {
-    if (!clientRef.current) clientRef.current = createClient();
-    return clientRef.current;
-  };
+  const supabase = createClient();
 
   const { theme, toggle } = useTheme();
   const dark = theme === "dark";
@@ -143,7 +122,7 @@ export function DashboardClient({
     .slice(0, 2);
 
   async function handleSignOut() {
-    await getSupabase().auth.signOut();
+    await supabase.auth.signOut();
     router.push("/signin");
     router.refresh();
   }
@@ -313,10 +292,7 @@ export function DashboardClient({
               </div>
             </div>
 
-            <p
-              className="mt-5 truncate text-lg font-bold"
-              style={{ color: "var(--text-heading)" }}
-            >
+            <p className="mt-5 truncate text-lg font-bold" style={{ color: "var(--text-heading)" }}>
               {profile?.university || "Not set"}
             </p>
 
@@ -345,12 +321,9 @@ export function DashboardClient({
               </div>
             </div>
 
-            <p
-              className="mt-5 text-lg font-bold"
-              style={{ color: "var(--text-heading)" }}
-            >
+            <p className="mt-5 text-lg font-bold" style={{ color: "var(--text-heading)" }}>
               {profile?.year_of_study
-                ? yearLabels[profile.year_of_study - 1] ?? "Not set"
+                ? (yearLabels[profile.year_of_study - 1] ?? "Not set")
                 : "Not set"}
             </p>
 
@@ -363,15 +336,9 @@ export function DashboardClient({
         {/* Main content */}
         <section className="grid gap-6 lg:grid-cols-5">
           {/* Student profile */}
-          <div
-            className="rounded-2xl border p-6 lg:col-span-2"
-            style={cardStyle}
-          >
+          <div className="rounded-2xl border p-6 lg:col-span-2" style={cardStyle}>
             <div className="flex items-center justify-between">
-              <h2
-                className="text-base font-bold"
-                style={{ color: "var(--text-heading)" }}
-              >
+              <h2 className="text-base font-bold" style={{ color: "var(--text-heading)" }}>
                 Your academic profile
               </h2>
 
@@ -390,10 +357,7 @@ export function DashboardClient({
               </div>
 
               <div className="min-w-0">
-                <p
-                  className="truncate text-sm font-bold"
-                  style={{ color: "var(--text-heading)" }}
-                >
+                <p className="truncate text-sm font-bold" style={{ color: "var(--text-heading)" }}>
                   {displayName}
                 </p>
 
@@ -410,7 +374,7 @@ export function DashboardClient({
                 [
                   "Year",
                   profile?.year_of_study
-                    ? yearLabels[profile.year_of_study - 1] ?? "Not set"
+                    ? (yearLabels[profile.year_of_study - 1] ?? "Not set")
                     : "Not set",
                 ],
                 ["Study style", readable(profile?.study_style)],
@@ -444,10 +408,7 @@ export function DashboardClient({
           >
             <div className="flex items-center justify-between">
               <div>
-                <h2
-                  className="text-base font-bold"
-                  style={{ color: "var(--text-heading)" }}
-                >
+                <h2 className="text-base font-bold" style={{ color: "var(--text-heading)" }}>
                   Suggested study partners
                 </h2>
 
@@ -477,15 +438,24 @@ export function DashboardClient({
               >
                 <Icon name="users" size={27} />
               </div>
-              <p className="font-semibold text-sm" style={{ color: "var(--text-sub)" }}>No matches yet</p>
-              <p className="text-xs max-w-xs leading-5" style={{ color: "var(--text-muted)" }}>
-                Add a course or assignment goal and your availability to find compatible study partners.
+
+              <h3 className="mt-5 text-base font-bold" style={{ color: "var(--text-heading)" }}>
+                Find your next study partner
+              </h3>
+
+              <p className="mt-2 max-w-sm text-sm leading-6" style={secondaryText}>
+                Create a course or assignment goal and add your availability to find compatible
+                study partners.
               </p>
 
               <Link
                 href="/partners"
-                className="mt-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all hover:-translate-y-px hover:shadow-md"
-                style={{ backgroundColor: "var(--btn-primary-bg)", color: "var(--btn-primary-fg)" }}
+                className="mt-5 rounded-xl border px-5 py-2.5 text-xs font-semibold transition hover:opacity-70"
+                style={{
+                  backgroundColor: "var(--bg-btn-outline)",
+                  borderColor: "var(--border-btn-outline)",
+                  color: "var(--text-btn-outline)",
+                }}
               >
                 Find partners
               </Link>
@@ -496,10 +466,7 @@ export function DashboardClient({
         {/* Quick actions */}
         <section className="mt-8">
           <div className="mb-4">
-            <h2
-              className="text-base font-bold"
-              style={{ color: "var(--text-heading)" }}
-            >
+            <h2 className="text-base font-bold" style={{ color: "var(--text-heading)" }}>
               Quick access
             </h2>
 
@@ -508,30 +475,64 @@ export function DashboardClient({
             </p>
           </div>
 
-        {/* ── Quick actions ────────────────────────────────── */}
-        <div className="mt-6 grid gap-4 sm:grid-cols-3">
-          {[
-            { icon: "🎯", title: "Set goals",       desc: "Define what you want to study" },
-            { icon: "🔍", title: "Browse partners", desc: "Explore students near you"     },
-            { icon: "💬", title: "Messages",         desc: "Chat with your connections"    },
-          ].map((action) => (
-            <button
-              key={action.title}
-              onClick={() => {
-                if (action.title === "Set goals" || action.title === "Browse partners") {
-                  router.push("/partners");
-                }
-              }}
-              className="rounded-2xl border p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
-              style={{ backgroundColor: "var(--bg-step)", borderColor: "var(--border-step)" }}
-            >
-              <span className="text-2xl">{action.icon}</span>
-              <p className="mt-3 font-semibold text-sm" style={{ color: "var(--text-heading)" }}>{action.title}</p>
-              <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>{action.desc}</p>
-            </button>
-          ))}
-        </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {[
+              {
+                icon: "book",
+                title: "My courses",
+                description: "Manage your academic subjects",
+                href: "/profile/courses",
+              },
+              {
+                icon: "users",
+                title: "Study partners",
+                description: "Find students with similar interests",
+                href: "/partners",
+              },
+              {
+                icon: "message",
+                title: "Messages",
+                description: "Connect with your study partners",
+                href: "/dashboard",
+              },
+            ].map((action) => (
+              <Link
+                href={action.href}
+                key={action.title}
+                className="group rounded-2xl border p-5 transition duration-200 hover:-translate-y-1"
+                style={cardStyle}
+              >
+                <div
+                  className="flex h-11 w-11 items-center justify-center rounded-xl"
+                  style={{
+                    backgroundColor: "var(--bg-row)",
+                    color: "var(--text-heading)",
+                  }}
+                >
+                  <Icon name={action.icon} />
+                </div>
+
+                <h3 className="mt-4 text-sm font-bold" style={{ color: "var(--text-heading)" }}>
+                  {action.title}
+                </h3>
+
+                <p className="mt-1 text-xs leading-5" style={secondaryText}>
+                  {action.description}
+                </p>
+              </Link>
+            ))}
+          </div>
         </section>
+
+        <footer
+          className="mt-12 border-t pt-6 text-center text-xs"
+          style={{
+            borderColor: "var(--border-nav)",
+            color: "var(--text-muted)",
+          }}
+        >
+          PartnerMatcher · Your study community
+        </footer>
       </main>
     </div>
   );

@@ -9,6 +9,7 @@ PartnerMatcher is a full-stack web application built for NYU Software Engineerin
 ## Quick Start
 
 ### Prerequisites
+
 - Node.js ≥ 20
 - npm ≥ 10
 
@@ -63,44 +64,44 @@ PartnerMatcher/
 
 ## Documentation
 
-| File | Purpose |
-|---|---|
-| [docs/skills.md](docs/skills.md) | Tech stack, required skills per role |
-| [docs/database.md](docs/database.md) | Full DB schema, ERD, migration strategy |
-| [docs/architecture.md](docs/architecture.md) | System design, component map, data flow |
-| [docs/api.md](docs/api.md) | Supabase clients, auth operations, RLS summary |
-| [docs/features.md](docs/features.md) | Feature specs, current state, roadmap |
-| [docs/deployment.md](docs/deployment.md) | Vercel, Docker, environment setup |
-| [docs/contributing.md](docs/contributing.md) | PR flow, commit conventions, branch rules |
-| [docs/changelog.md](docs/changelog.md) | Version history |
+| File                                         | Purpose                                        |
+| -------------------------------------------- | ---------------------------------------------- |
+| [docs/skills.md](docs/skills.md)             | Tech stack, required skills per role           |
+| [docs/database.md](docs/database.md)         | Full DB schema, ERD, migration strategy        |
+| [docs/architecture.md](docs/architecture.md) | System design, component map, data flow        |
+| [docs/api.md](docs/api.md)                   | Supabase clients, auth operations, RLS summary |
+| [docs/features.md](docs/features.md)         | Feature specs, current state, roadmap          |
+| [docs/deployment.md](docs/deployment.md)     | Vercel, Docker, environment setup              |
+| [docs/contributing.md](docs/contributing.md) | PR flow, commit conventions, branch rules      |
+| [docs/changelog.md](docs/changelog.md)       | Version history                                |
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 16 (App Router, Turbopack) |
-| Language | TypeScript 5 |
-| Styling | Tailwind CSS v4 + CSS custom properties |
-| Runtime | React 19 |
-| Auth & Database | Supabase (PostgreSQL 15 + RLS) |
-| Sessions | `@supabase/ssr` cookie-based sessions |
-| Icons | Inline SVG |
-| Fonts | Geist Sans / Geist Mono |
+| Layer           | Technology                              |
+| --------------- | --------------------------------------- |
+| Framework       | Next.js 16 (App Router, Turbopack)      |
+| Language        | TypeScript 5                            |
+| Styling         | Tailwind CSS v4 + CSS custom properties |
+| Runtime         | React 19                                |
+| Auth & Database | Supabase (PostgreSQL 15 + RLS)          |
+| Sessions        | `@supabase/ssr` cookie-based sessions   |
+| Icons           | Inline SVG                              |
+| Fonts           | Geist Sans / Geist Mono                 |
 
 ---
 
 ## Current Pages
 
-| Route | Description |
-|---|---|
-| `/signin` | Two-column sign-in with GitHub/Google OAuth + email/password |
-| `/signup` | Registration with email or OAuth |
-| `/onboarding` | 7-step wizard: university, major, year, study style, comm pref, timezone, courses |
-| `/dashboard` | Profile overview, course count, suggested partners |
-| `/profile` | Full profile editor |
-| `/profile/courses` | Add/remove courses |
+| Route              | Description                                                                       |
+| ------------------ | --------------------------------------------------------------------------------- |
+| `/signin`          | Two-column sign-in with GitHub/Google OAuth + email/password                      |
+| `/signup`          | Registration with email or OAuth                                                  |
+| `/onboarding`      | 7-step wizard: university, major, year, study style, comm pref, timezone, courses |
+| `/dashboard`       | Profile overview, course count, suggested partners                                |
+| `/profile`         | Full profile editor                                                               |
+| `/profile/courses` | Add/remove courses                                                                |
 
 ---
 

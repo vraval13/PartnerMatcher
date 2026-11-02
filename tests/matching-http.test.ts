@@ -1,12 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createClient } from "@supabase/supabase-js";
-import {
-  findMatches,
-  saveGoal,
-  archiveGoal,
-  listGoals,
-} from "../lib/matching/http";
+import { findMatches, saveGoal, archiveGoal, listGoals } from "../lib/matching/http";
 const id = "11111111-1111-4111-8111-111111111111";
 const goalId = "22222222-2222-4222-8222-222222222222";
 const now = new Date("2026-11-02T12:00:00Z");
@@ -34,26 +29,19 @@ const stored = {
     },
   ],
 };
-function db(
-  lookup: (url: URL, init?: RequestInit) => unknown,
-  signedIn = true,
-) {
-  const client = createClient(
-    "https://example.supabase.co",
-    "public-test-key",
-    {
-      auth: { persistSession: false, autoRefreshToken: false },
-      global: {
-        fetch: async (input, init) => {
-          const data = lookup(new URL(String(input)), init);
-          return new Response(JSON.stringify(data), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          });
-        },
+function db(lookup: (url: URL, init?: RequestInit) => unknown, signedIn = true) {
+  const client = createClient("https://example.supabase.co", "public-test-key", {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: {
+      fetch: async (input, init) => {
+        const data = lookup(new URL(String(input)), init);
+        return new Response(JSON.stringify(data), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
       },
     },
-  );
+  });
   // Auth verification is stubbed; all PostgREST requests use the real Supabase client.
   Object.defineProperty(client, "auth", {
     value: {
@@ -113,7 +101,7 @@ test("US04: no match produces explicit message with an empty list", async () => 
   const response = await findMatches(
     db((url) => (url.searchParams.has("id") ? stored : [])),
     request({ goal_id: goalId }),
-    now,
+    now
   );
   assert.deepEqual((await response.json()).matches, []);
 });
@@ -127,9 +115,7 @@ test("US05: candidate lookup filters exact assignment before ranking", async () 
   const client = db((url) => {
     if (url.searchParams.has("id")) return assignment;
     assert.equal(url.searchParams.get("assignment_id"), "eq.HW-01");
-    return [
-      { ...assignment, id: "candidate", user_id: "other", is_listed: true },
-    ];
+    return [{ ...assignment, id: "candidate", user_id: "other", is_listed: true }];
   });
   const response = await findMatches(client, request({ goal_id: goalId }), now);
   assert.equal((await response.json()).matches[0].final_score, 120);
@@ -140,14 +126,8 @@ test("permission: missing, foreign or archived goal returns indistinguishable 40
     assert.equal(url.searchParams.get("archived_at"), "is.null");
     return null;
   });
-  assert.equal(
-    (await findMatches(client, request({ goal_id: goalId }), now)).status,
-    404,
-  );
-  assert.equal(
-    (await archiveGoal(client, request({ goal_id: goalId }))).status,
-    404,
-  );
+  assert.equal((await findMatches(client, request({ goal_id: goalId }), now)).status, 404);
+  assert.equal((await archiveGoal(client, request({ goal_id: goalId }))).status, 404);
 });
 test("validation: invalid ID, malformed JSON, expired assignment and invalid save return 422", async () => {
   const client = db(() => ({
@@ -156,24 +136,13 @@ test("validation: invalid ID, malformed JSON, expired assignment and invalid sav
     assignment_id: "A",
     due_date: "2026-11-01",
   }));
+  assert.equal((await findMatches(client, request({ goal_id: "bad" }), now)).status, 422);
   assert.equal(
-    (await findMatches(client, request({ goal_id: "bad" }), now)).status,
-    422,
+    (await findMatches(client, new Request("http://localhost", { method: "POST", body: "{" }), now))
+      .status,
+    422
   );
-  assert.equal(
-    (
-      await findMatches(
-        client,
-        new Request("http://localhost", { method: "POST", body: "{" }),
-        now,
-      )
-    ).status,
-    422,
-  );
-  assert.equal(
-    (await findMatches(client, request({ goal_id: goalId }), now)).status,
-    422,
-  );
+  assert.equal((await findMatches(client, request({ goal_id: goalId }), now)).status, 422);
   assert.equal((await saveGoal(client, request({}), now)).status, 422);
 });
 test("saving uses atomic RPC with validated fields, never client-supplied owner", async () => {
@@ -195,7 +164,7 @@ test("saving uses atomic RPC with validated fields, never client-supplied owner"
       })),
       user_id: "attacker",
     }),
-    now,
+    now
   );
   assert.equal(response.status, 201);
   assert.equal((await response.json()).id, goalId);
@@ -206,11 +175,8 @@ test("database outage returns actionable 503 without raw database details", asyn
       throw new Error("private database detail");
     }),
     request({ goal_id: goalId }),
-    now,
+    now
   );
   assert.equal(response.status, 503);
-  assert.doesNotMatch(
-    JSON.stringify(await response.json()),
-    /private database detail/,
-  );
+  assert.doesNotMatch(JSON.stringify(await response.json()), /private database detail/);
 });

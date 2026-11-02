@@ -1,11 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  rankCandidates,
-  validateGoal,
-  ValidationError,
-  type Goal,
-  type Slot,
-} from "./engine";
+import { rankCandidates, validateGoal, ValidationError, type Goal, type Slot } from "./engine";
 
 type DBGoal = Omit<Goal, "availability"> & { matching_availability: Slot[] };
 const selection =
@@ -32,10 +26,9 @@ function failure(error: unknown): Response {
   if (error instanceof ValidationError || error instanceof SyntaxError)
     return reply(
       {
-        error:
-          error instanceof SyntaxError ? "Invalid JSON body." : error.message,
+        error: error instanceof SyntaxError ? "Invalid JSON body." : error.message,
       },
-      422,
+      422
     );
   // Do not expose database details or account identifiers to clients.
   return reply(
@@ -43,7 +36,7 @@ function failure(error: unknown): Response {
       error:
         "Matching storage is unavailable. Ask your team administrator to apply the US04/US05 database migration, then retry.",
     },
-    503,
+    503
   );
 }
 async function userId(db: SupabaseClient) {
@@ -66,11 +59,7 @@ export async function listGoals(db: SupabaseClient) {
     return failure(error);
   }
 }
-export async function saveGoal(
-  db: SupabaseClient,
-  request: Request,
-  now = new Date(),
-) {
+export async function saveGoal(db: SupabaseClient, request: Request, now = new Date()) {
   try {
     const id = await userId(db);
     if (!id) return reply({ error: "Sign in to save a matching goal." }, 401);
@@ -89,8 +78,7 @@ export async function archiveGoal(db: SupabaseClient, request: Request) {
     const id = await userId(db);
     if (!id) return reply({ error: "Sign in to remove a goal." }, 401);
     const body = await request.json();
-    if (!uuid.test(body?.goal_id ?? ""))
-      throw new ValidationError("A valid goal_id is required.");
+    if (!uuid.test(body?.goal_id ?? "")) throw new ValidationError("A valid goal_id is required.");
     const { data, error } = await db
       .from("matching_goals")
       .update({ archived_at: new Date().toISOString(), is_listed: false })
@@ -100,24 +88,17 @@ export async function archiveGoal(db: SupabaseClient, request: Request) {
       .select("id")
       .maybeSingle();
     if (error) throw error;
-    return data
-      ? reply({ id: data.id, archived: true })
-      : reply({ error: "Goal not found." }, 404);
+    return data ? reply({ id: data.id, archived: true }) : reply({ error: "Goal not found." }, 404);
   } catch (error) {
     return failure(error);
   }
 }
-export async function findMatches(
-  db: SupabaseClient,
-  request: Request,
-  now = new Date(),
-) {
+export async function findMatches(db: SupabaseClient, request: Request, now = new Date()) {
   try {
     const id = await userId(db);
     if (!id) return reply({ error: "Sign in to find partners." }, 401);
     const body = await request.json();
-    if (!uuid.test(body?.goal_id ?? ""))
-      throw new ValidationError("A valid goal_id is required.");
+    if (!uuid.test(body?.goal_id ?? "")) throw new ValidationError("A valid goal_id is required.");
     // Explicit ownership filter even though listed candidate goals are readable under RLS.
     const own = await db
       .from("matching_goals")
@@ -137,21 +118,12 @@ export async function findMatches(
       .is("archived_at", null)
       .neq("user_id", id)
       .eq("mode", query.mode)
-      .eq(
-        "institution_key",
-        query.institution.trim().replace(/\s+/g, " ").toLowerCase(),
-      )
-      .eq(
-        "course_key",
-        query.course_code.trim().replace(/\s+/g, " ").toLowerCase(),
-      );
+      .eq("institution_key", query.institution.trim().replace(/\s+/g, " ").toLowerCase())
+      .eq("course_key", query.course_code.trim().replace(/\s+/g, " ").toLowerCase());
     fetch =
       query.mode === "assignment"
         ? fetch.eq("assignment_id", query.assignment_id!)
-        : fetch.eq(
-            "topic_key",
-            query.topic.trim().replace(/\s+/g, " ").toLowerCase(),
-          );
+        : fetch.eq("topic_key", query.topic.trim().replace(/\s+/g, " ").toLowerCase());
     // Fetch one over the supported cap; never silently rank an incomplete candidate set.
     const { data, error } = await fetch.order("id").limit(1000);
     if (error) throw error;
@@ -161,7 +133,7 @@ export async function findMatches(
           error:
             "Too many eligible goals. Please contact the team to increase the matching capacity.",
         },
-        422,
+        422
       );
     const matches = rankCandidates(query, (data as DBGoal[]).map(goal), now);
     return reply({

@@ -34,36 +34,32 @@ export default async function EditCoursesPage() {
   }
 
   const courses = (courseRows ?? [])
-    .map((row: {
-      course_id: string;
-      goal: string | null;
-      semester: string | null;
-      courses:
-        | { name: string | null; code: string | null }
-        | { name: string | null; code: string | null }[]
-        | null;
-    }) => {
-      const course = Array.isArray(row.courses)
-        ? row.courses[0]
-        : row.courses;
+    .map(
+      (row: {
+        course_id: string;
+        goal: string | null;
+        semester: string | null;
+        courses:
+          | { name: string | null; code: string | null }
+          | { name: string | null; code: string | null }[]
+          | null;
+      }) => {
+        const course = Array.isArray(row.courses) ? row.courses[0] : row.courses;
 
-      if (!course) return null;
+        if (!course) return null;
 
-      return {
-        course_id: row.course_id,
-        name: course.name ?? "",
-        code: course.code ?? "",
-        goal: row.goal ?? "study",
-        semester: row.semester ?? "Fall 2026",
-      };
-    })
+        return {
+          course_id: row.course_id,
+          name: course.name ?? "",
+          code: course.code ?? "",
+          goal: row.goal ?? "study",
+          semester: row.semester ?? "Fall 2026",
+        };
+      }
+    )
     .filter((course) => course !== null);
 
   return (
-    <CoursesClient
-      userId={user.id}
-      university={profile.university}
-      initialCourses={courses}
-    />
+    <CoursesClient userId={user.id} university={profile.university} initialCourses={courses} />
   );
 }

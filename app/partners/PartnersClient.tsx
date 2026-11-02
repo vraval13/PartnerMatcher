@@ -1,22 +1,9 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
-import type {
-  Goal,
-  GoalInput,
-  rankCandidates,
-  Slot,
-} from "@/lib/matching/engine";
+import type { Goal, GoalInput, rankCandidates, Slot } from "@/lib/matching/engine";
 type Match = ReturnType<typeof rankCandidates>[number];
-const weekdays = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
-];
+const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const blank: GoalInput = {
   mode: "course",
   display_name: "",
@@ -38,16 +25,14 @@ const blank: GoalInput = {
     },
   ],
 };
-const inputClass =
-  "w-full rounded-lg border border-slate-500/40 bg-transparent px-3 py-2 mt-1";
+const inputClass = "w-full rounded-lg border border-slate-500/40 bg-transparent px-3 py-2 mt-1";
 async function api(url: string, init?: RequestInit) {
   const response = await fetch(url, {
     ...init,
     headers: { "Content-Type": "application/json" },
   });
   const data = await response.json();
-  if (!response.ok)
-    throw new Error(data.error ?? "Request failed. Please try again.");
+  if (!response.ok) throw new Error(data.error ?? "Request failed. Please try again.");
   return data;
 }
 export default function PartnersClient() {
@@ -81,7 +66,7 @@ export default function PartnersClient() {
   function slot(index: number, patch: Partial<Slot>) {
     change(
       "availability",
-      form.availability.map((s, i) => (i === index ? { ...s, ...patch } : s)),
+      form.availability.map((s, i) => (i === index ? { ...s, ...patch } : s))
     );
   }
   async function save(event: FormEvent) {
@@ -145,14 +130,8 @@ export default function PartnersClient() {
   }
   function field(
     label: string,
-    key:
-      | "display_name"
-      | "institution"
-      | "course_code"
-      | "topic"
-      | "location"
-      | "timezone",
-    max: number,
+    key: "display_name" | "institution" | "course_code" | "topic" | "location" | "timezone",
+    max: number
   ) {
     return (
       <label className="block text-sm">
@@ -178,23 +157,16 @@ export default function PartnersClient() {
         </Link>
         <h1 className="mt-5 text-3xl font-bold">Find a study partner</h1>
         <p className="mt-2 text-sm opacity-75">
-          Match by course topic or exact assignment. Availability is compared
-          across time zones over the next 14 days, ending at assignment
-          deadlines.
+          Match by course topic or exact assignment. Availability is compared across time zones over
+          the next 14 days, ending at assignment deadlines.
         </p>
         {error && (
-          <p
-            role="alert"
-            className="mt-5 rounded-xl border border-red-400 bg-red-500/10 p-4"
-          >
+          <p role="alert" className="mt-5 rounded-xl border border-red-400 bg-red-500/10 p-4">
             {error}
           </p>
         )}
         {message && (
-          <p
-            role="status"
-            className="mt-5 rounded-xl border border-indigo-400 p-4"
-          >
+          <p role="status" className="mt-5 rounded-xl border border-indigo-400 p-4">
             {message}
           </p>
         )}
@@ -252,11 +224,7 @@ export default function PartnersClient() {
                   </label>
                 </>
               )}
-              {field(
-                "Goal timezone (IANA, e.g. America/New_York)",
-                "timezone",
-                80,
-              )}
+              {field("Goal timezone (IANA, e.g. America/New_York)", "timezone", 80)}
               <label className="block text-sm">
                 Location preference
                 <select
@@ -265,7 +233,7 @@ export default function PartnersClient() {
                   onChange={(e) =>
                     change(
                       "location_preference",
-                      e.target.value as GoalInput["location_preference"],
+                      e.target.value as GoalInput["location_preference"]
                     )
                   }
                 >
@@ -275,26 +243,17 @@ export default function PartnersClient() {
                 </select>
               </label>
               {form.location_preference !== "online" &&
-                field(
-                  "Meeting location (required for in person)",
-                  "location",
-                  120,
-                )}
+                field("Meeting location (required for in person)", "location", 120)}
               <fieldset className="space-y-3">
                 <legend className="font-semibold">Weekly availability</legend>
                 {form.availability.map((s, i) => (
-                  <div
-                    key={i}
-                    className="rounded-lg border border-slate-500/30 p-3 space-y-2"
-                  >
+                  <div key={i} className="rounded-lg border border-slate-500/30 p-3 space-y-2">
                     <label className="block text-sm">
                       Day
                       <select
                         className={inputClass}
                         value={s.weekday}
-                        onChange={(e) =>
-                          slot(i, { weekday: Number(e.target.value) })
-                        }
+                        onChange={(e) => slot(i, { weekday: Number(e.target.value) })}
                       >
                         {weekdays.map((d, j) => (
                           <option value={j} key={d}>
@@ -311,9 +270,7 @@ export default function PartnersClient() {
                           type="time"
                           required
                           value={s.start_time}
-                          onChange={(e) =>
-                            slot(i, { start_time: e.target.value })
-                          }
+                          onChange={(e) => slot(i, { start_time: e.target.value })}
                         />
                       </label>
                       <label className="text-sm">
@@ -323,9 +280,7 @@ export default function PartnersClient() {
                           type="time"
                           required
                           value={s.end_time}
-                          onChange={(e) =>
-                            slot(i, { end_time: e.target.value })
-                          }
+                          onChange={(e) => slot(i, { end_time: e.target.value })}
                         />
                       </label>
                     </div>
@@ -345,7 +300,7 @@ export default function PartnersClient() {
                         onClick={() =>
                           change(
                             "availability",
-                            form.availability.filter((_, j) => i !== j),
+                            form.availability.filter((_, j) => i !== j)
                           )
                         }
                       >
@@ -379,8 +334,8 @@ export default function PartnersClient() {
                   checked={form.is_listed}
                   onChange={(e) => change("is_listed", e.target.checked)}
                 />
-                Let signed-in students find this goal and see my display name,
-                study details, and availability.
+                Let signed-in students find this goal and see my display name, study details, and
+                availability.
               </label>
               <button
                 disabled={busy || loading}
@@ -396,8 +351,8 @@ export default function PartnersClient() {
               <p className="mt-4">Loading goals…</p>
             ) : goals.length === 0 ? (
               <p className="mt-4 text-sm opacity-75">
-                Create a goal to begin. Other students must list compatible
-                goals before matches can appear.
+                Create a goal to begin. Other students must list compatible goals before matches can
+                appear.
               </p>
             ) : (
               <>
@@ -416,8 +371,7 @@ export default function PartnersClient() {
                     <option value="">Choose a saved goal</option>
                     {goals.map((g) => (
                       <option key={g.id} value={g.id}>
-                        {g.course_code} ·{" "}
-                        {g.mode === "assignment" ? g.assignment_id : g.topic} ·{" "}
+                        {g.course_code} · {g.mode === "assignment" ? g.assignment_id : g.topic} ·{" "}
                         {g.is_listed ? "Listed" : "Private"}
                       </option>
                     ))}
@@ -442,14 +396,11 @@ export default function PartnersClient() {
               </>
             )}
             <p className="mt-4 text-xs opacity-70">
-              Weights: topic 40% · availability 35% · location 25%. Assignment
-              urgency proposal: ≤2 days ×1.2; ≤7 days ×1.1; otherwise ×1.0.
-              Final scores may exceed 100.
+              Weights: topic 40% · availability 35% · location 25%. Assignment urgency proposal: ≤2
+              days ×1.2; ≤7 days ×1.1; otherwise ×1.0. Final scores may exceed 100.
             </p>
             {matches && matches.length > 0 && (
-              <p className="mt-5 text-sm">
-                Ranked by final compatibility score, highest first.
-              </p>
+              <p className="mt-5 text-sm">Ranked by final compatibility score, highest first.</p>
             )}
             <div className="mt-4 space-y-4">
               {matches?.map((m) => (
@@ -479,12 +430,9 @@ export default function PartnersClient() {
                     ))}
                   </dl>
                   <p className="mt-3 text-sm">
-                    Base {m.base_score} × urgency {m.urgency_multiplier} ={" "}
-                    <b>{m.final_score}</b>
+                    Base {m.base_score} × urgency {m.urgency_multiplier} = <b>{m.final_score}</b>
                   </p>
-                  <p className="mt-2 text-sm">
-                    {m.overlap_minutes} overlapping minutes
-                  </p>
+                  <p className="mt-2 text-sm">{m.overlap_minutes} overlapping minutes</p>
                   <ul className="mt-1 text-xs space-y-1">
                     {m.overlapping_slots.slice(0, 4).map((s) => (
                       <li key={s.start}>
@@ -494,8 +442,7 @@ export default function PartnersClient() {
                     ))}
                   </ul>
                   <p className="mt-2 text-xs opacity-60">
-                    Times shown in your browser timezone. Scoring:{" "}
-                    {m.configuration_version}
+                    Times shown in your browser timezone. Scoring: {m.configuration_version}
                   </p>
                 </article>
               ))}

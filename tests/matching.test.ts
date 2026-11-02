@@ -1,10 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-  rankCandidates,
-  validateGoal,
-  type Goal,
-} from "../lib/matching/engine";
+import { rankCandidates, validateGoal, type Goal } from "../lib/matching/engine";
 const now = new Date("2026-11-02T12:00:00Z"); // Monday, after New York DST transition.
 function goal(p: Partial<Goal> = {}): Goal {
   return {
@@ -33,8 +29,7 @@ function goal(p: Partial<Goal> = {}): Goal {
     ...p,
   };
 }
-const candidate = (p: Partial<Goal> = {}) =>
-  goal({ id: "a", user_id: p.id ?? "other", ...p });
+const candidate = (p: Partial<Goal> = {}) => goal({ id: "a", user_id: p.id ?? "other", ...p });
 test("US04: descending score, components, approved weights, stable tie-breaker", () => {
   const results = rankCandidates(
     goal(),
@@ -47,11 +42,11 @@ test("US04: descending score, components, approved weights, stable tie-breaker",
         location: "Library",
       }),
     ],
-    now,
+    now
   );
   assert.deepEqual(
     results.map((r) => r.candidate_goal_id),
-    ["a", "z", "b"],
+    ["a", "z", "b"]
   );
   assert.equal(results[0].final_score, 100);
   assert.equal(results[2].base_score, 75);
@@ -87,7 +82,7 @@ test("US04: exclude unrelated topic/course, no overlap, self, private and archiv
       candidate({ archived_at: now.toISOString() }),
       candidate({ institution: "Other university" }),
     ],
-    now,
+    now
   );
   assert.deepEqual(results, []);
 });
@@ -106,7 +101,7 @@ test("US04: timezone conversion and partial overlap are measurable", () => {
         ],
       }),
     ],
-    now,
+    now
   );
   assert.equal(results[0].components.availability, 50);
   assert.equal(results[0].overlap_minutes, 120);
@@ -140,11 +135,7 @@ test("US04: nonexistent DST time is skipped instead of shifted", () => {
       },
     ],
   });
-  const results = rankCandidates(
-    q,
-    [candidate({ availability: q.availability })],
-    dst,
-  );
+  const results = rankCandidates(q, [candidate({ availability: q.availability })], dst);
   assert.equal(results[0].overlap_minutes, 60); // Only following Sunday is a valid occurrence.
 });
 test("US05: exact course and case-sensitive assignment ID gate precedes any scoring", () => {
@@ -165,11 +156,11 @@ test("US05: exact course and case-sensitive assignment ID gate precedes any scor
       { ...good, id: "bad", assignment_id: "hw-01" },
       { ...good, id: "bad-course", course_code: "CS999" },
     ],
-    now,
+    now
   );
   assert.deepEqual(
     results.map((r) => r.candidate_goal_id),
-    ["a"],
+    ["a"]
   );
   assert.equal(results[0].urgency_multiplier, 1.2);
   assert.equal(results[0].final_score, 99);
@@ -248,9 +239,9 @@ test("US05: deadlines clip overlap and past/invalid dates cannot be saved", () =
           ],
         }),
       ],
-      now,
+      now
     ),
-    [],
+    []
   );
   for (const due_date of ["2026-11-01", "2026-02-30", "invalid"])
     assert.throws(() => validateGoal({ ...q, due_date }, now));
@@ -261,9 +252,7 @@ test("validation: malformed times, invalid zones, empty slots and duplicate slot
     { availability: [] },
     { availability: [...goal().availability, ...goal().availability] },
     {
-      availability: [
-        { weekday: 0, start_time: "16:00", end_time: "14:00", timezone: "UTC" },
-      ],
+      availability: [{ weekday: 0, start_time: "16:00", end_time: "14:00", timezone: "UTC" }],
     },
     { assignment_id: "unrelated" },
   ])
@@ -286,7 +275,7 @@ test("US05: configurable urgency bands and deterministic as_of", () => {
     rankCandidates(q, [c], now, {
       version: "invalid",
       urgency: [{ within_days: 2, multiplier: NaN }],
-    }),
+    })
   );
 });
 
@@ -302,7 +291,7 @@ test("US04: one best-scoring goal per student avoids duplicate partners", () => 
       }),
       candidate({ id: "b", user_id: "same" }),
     ],
-    now,
+    now
   );
   assert.equal(results.length, 1);
   assert.equal(results[0].candidate_goal_id, "b");
@@ -330,10 +319,9 @@ test("US05: urgency is applied before sorting the final results", () => {
   const results = rankCandidates(query, [far, urgent], now);
   assert.deepEqual(
     results.map((r) => r.candidate_goal_id),
-    ["urgent", "far"],
+    ["urgent", "far"]
   );
   assert.ok(
-    results[0].base_score < results[1].base_score ||
-      results[0].final_score > results[1].final_score,
+    results[0].base_score < results[1].base_score || results[0].final_score > results[1].final_score
   );
 });

@@ -9,7 +9,9 @@ export default async function OnboardingPage() {
   await connection();
   const supabase = await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) redirect("/signin");
 
   // If already onboarded, skip to dashboard
