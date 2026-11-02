@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
@@ -14,7 +15,11 @@ const stats = [
 
 export function DashboardClient({ user }: { user: User }) {
   const router = useRouter();
-  const supabase = createClient();
+  const clientRef = useRef<ReturnType<typeof createClient> | null>(null);
+  const getSupabase = () => {
+    if (!clientRef.current) clientRef.current = createClient();
+    return clientRef.current;
+  };
 
   const displayName =
     user.user_metadata?.full_name ??
@@ -30,7 +35,7 @@ export function DashboardClient({ user }: { user: User }) {
     .slice(0, 2);
 
   async function handleSignOut() {
-    await supabase.auth.signOut();
+    await getSupabase().auth.signOut();
     router.push("/signin");
     router.refresh();
   }
