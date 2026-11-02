@@ -2,7 +2,6 @@ export const instant = false;
 
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { CoursesClient } from "./CoursesClient";
 

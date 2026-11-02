@@ -1,9 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+
+function currentSemester(): string {
+  const m = new Date().getMonth() + 1;
+  const y = new Date().getFullYear();
+  if (m <= 5) return `Spring ${y}`;
+  if (m <= 7) return `Summer ${y}`;
+  return `Fall ${y}`;
+}
 import { useTheme } from "@/app/components/ThemeProvider";
 
 type Course = {
@@ -32,7 +40,11 @@ export function CoursesClient({
   initialCourses: Course[];
 }) {
   const router = useRouter();
-  const supabase = createClient();
+  const clientRef = useRef<ReturnType<typeof createClient> | null>(null);
+  const getSupabase = () => {
+    if (!clientRef.current) clientRef.current = createClient();
+    return clientRef.current;
+  };
   const { theme, toggle } = useTheme();
 
   const [courses, setCourses] = useState<Course[]>(initialCourses);
@@ -58,7 +70,7 @@ export function CoursesClient({
         name: "",
         code: "",
         goal: "study",
-        semester: "Fall 2026",
+        semester: currentSemester(),
       },
     ]);
   }
@@ -96,7 +108,7 @@ export function CoursesClient({
         const courseName = course.name.trim();
         const courseCode = course.code.trim();
 
-        const { data: existingCourse, error: searchError } = await supabase
+        const { data: existingCourse, error: searchError } = await getSupabase()
           .from("courses")
           .select("id")
           .eq("code", courseCode)
@@ -112,7 +124,7 @@ export function CoursesClient({
         if (existingCourse) {
           courseId = existingCourse.id;
         } else {
-          const { data: newCourse, error: insertError } = await supabase
+          const { data: newCourse, error: insertError } = await getSupabase()
             .from("courses")
             .insert({
               name: courseName,
@@ -133,14 +145,14 @@ export function CoursesClient({
 
         savedCourseIds.push(courseId);
 
-        const { error: associationError } = await supabase
+        const { error: associationError } = await getSupabase()
           .from("user_courses")
           .upsert(
             {
               user_id: userId,
               course_id: courseId,
               goal: course.goal,
-              semester: course.semester || "Fall 2026",
+              semester: course.semester || currentSemester(),
             },
             {
               onConflict: "user_id,course_id,goal",
@@ -155,7 +167,7 @@ export function CoursesClient({
 
       const uniqueCourseIds = [...new Set(savedCourseIds)];
 
-      const { error: deleteError } = await supabase
+      const { error: deleteError } = await getSupabase()
         .from("user_courses")
         .delete()
         .eq("user_id", userId)

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 const LeftPanel = () => (
@@ -78,6 +79,7 @@ const LeftPanel = () => (
 );
 
 export default function SignUpPage() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -132,9 +134,9 @@ export default function SignUpPage() {
         return;
       }
 
-      // Suppress unused variable warning
       void json;
-      window.location.href = "/onboarding";
+      router.push("/onboarding");
+      router.refresh();
       return;
     }
 

@@ -240,18 +240,16 @@ export function OnboardingClient({ user }: { user: User }) {
       let courseId: string | null = null;
 
       if (code) {
-        // upsert on the partial unique index (code, university) then re-read on conflict
-        const { data: upserted, error: upErr } = await getSupabase()
-          .from("courses")
-          .upsert({ name, code, university: uni }, { onConflict: "code,university", ignoreDuplicates: true })
-          .select("id")
-          .maybeSingle();
-        if (upErr || !upserted) {
-          const { data: existing } = await getSupabase()
-            .from("courses").select("id").eq("code", code).eq("university", uni).maybeSingle();
-          courseId = existing?.id ?? null;
+        // SELECT first — partial unique index (code,university WHERE code IS NOT NULL)
+        // cannot be used as a PostgREST onConflict target, so we do read-then-insert.
+        const { data: existing } = await getSupabase()
+          .from("courses").select("id").eq("code", code).eq("university", uni).maybeSingle();
+        if (existing) {
+          courseId = existing.id;
         } else {
-          courseId = upserted.id;
+          const { data: inserted } = await getSupabase()
+            .from("courses").insert({ name, code, university: uni }).select("id").maybeSingle();
+          courseId = inserted?.id ?? null;
         }
       } else {
         // NULL code: match by name + university to avoid duplicates
