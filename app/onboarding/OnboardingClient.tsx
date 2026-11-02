@@ -32,6 +32,14 @@ const COURSE_GOALS = [
 
 const YEARS = ["1st year", "2nd year", "3rd year", "4th year", "5th year", "Graduate", "PhD"];
 
+function currentSemester(): string {
+  const m = new Date().getMonth() + 1;
+  const y = new Date().getFullYear();
+  if (m <= 5) return `Spring ${y}`;
+  if (m <= 7) return `Summer ${y}`;
+  return `Fall ${y}`;
+}
+
 const TIMEZONES = [
   "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
   "Europe/London", "Europe/Paris", "Asia/Dubai", "Asia/Kolkata",
@@ -198,6 +206,7 @@ export function OnboardingClient({ user }: { user: User }) {
           study_style:   studyStyle,
           comm_pref:     commPref,
           timezone,
+          onboarded_at:  new Date().toISOString(),
         })
         .eq("user_id", user.id);
       setSaving(false);
@@ -236,7 +245,7 @@ export function OnboardingClient({ user }: { user: User }) {
       if (courseErr || !courseRow) continue;
 
       const { error: ucErr } = await getSupabase().from("user_courses").upsert(
-        { user_id: user.id, course_id: courseRow.id, goal: c.goal, semester: "Fall 2026" },
+        { user_id: user.id, course_id: courseRow.id, goal: c.goal, semester: currentSemester() },
         { onConflict: "user_id,course_id,goal", ignoreDuplicates: true }
       );
 
