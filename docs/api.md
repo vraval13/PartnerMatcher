@@ -4,8 +4,8 @@ PartnerMatcher has **no custom REST API server**. All data access goes through t
 
 There is one internal Next.js API Route:
 
-| Route | Purpose | Available |
-|---|---|---|
+| Route                     | Purpose                                         | Available                            |
+| ------------------------- | ----------------------------------------------- | ------------------------------------ |
 | `POST /api/auth/register` | Pre-confirmed account creation for dev use only | Dev only — returns 404 in production |
 
 ---
@@ -15,6 +15,7 @@ There is one internal Next.js API Route:
 Three Supabase clients live in `frontend/lib/supabase/`:
 
 ### `lib/supabase/client.ts` — Browser client
+
 Used in Client Components (`"use client"`).
 
 ```ts
@@ -25,6 +26,7 @@ const supabase = getSupabase();
 Uses the anon key (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`). Safe to ship to the browser. All queries are subject to Row Level Security.
 
 ### `lib/supabase/server.ts` — SSR cookie client
+
 Used in Server Components, Route Handlers, and `middleware.ts`.
 
 ```ts
@@ -35,6 +37,7 @@ const supabase = await createServerClient();
 Reads and writes the session cookie via `@supabase/ssr`. Always use `supabase.auth.getUser()` (not `getSession()`) to verify auth server-side.
 
 ### `lib/supabase/admin.ts` — Service-role client
+
 Used only in the dev-only `/api/auth/register` route handler. **Never imported from browser code.**
 
 ```ts
@@ -123,10 +126,14 @@ await supabase.auth.signOut();
 ```ts
 // Server Component
 const supabase = await createServerClient();
-const { data: { user } } = await supabase.auth.getUser();
+const {
+  data: { user },
+} = await supabase.auth.getUser();
 const { data: profile } = await supabase
   .from("profiles")
-  .select("full_name, email, onboarded_at, university, major, year_of_study, timezone, study_style, comm_pref")
+  .select(
+    "full_name, email, onboarded_at, university, major, year_of_study, timezone, study_style, comm_pref"
+  )
   .eq("user_id", user.id)
   .single();
 ```
@@ -212,13 +219,13 @@ function currentSemester(): string {
 
 All Supabase queries from the browser are filtered by RLS automatically. Key policies:
 
-| Table | What users can do |
-|---|---|
-| `profiles` | Read own row + all discoverable profiles; update own row only |
-| `courses` | Read all; insert and update (authenticated users, for onboarding) |
-| `user_courses` | Read own + discoverable users; write own only |
-| `notifications` | Read and mark-read own only; inserts via service role |
-| `match_scores` | Read own pair rows; service role only for writes |
+| Table           | What users can do                                                 |
+| --------------- | ----------------------------------------------------------------- |
+| `profiles`      | Read own row + all discoverable profiles; update own row only     |
+| `courses`       | Read all; insert and update (authenticated users, for onboarding) |
+| `user_courses`  | Read own + discoverable users; write own only                     |
+| `notifications` | Read and mark-read own only; inserts via service role             |
+| `match_scores`  | Read own pair rows; service role only for writes                  |
 
 Full policy definitions are in `docs/sql/supabase_schema.sql`.
 
@@ -242,6 +249,7 @@ Content-Type: application/json
 ```
 
 Response `201`:
+
 ```json
 { "user_id": "uuid" }
 ```
@@ -252,12 +260,12 @@ Errors: `400` validation, `409` email taken, `404` in production.
 
 ## Environment variables
 
-| Variable | Where used | Notes |
-|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Browser + server | Project URL from Supabase dashboard |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Browser + server | Anon/public key — safe to expose |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server only | Never sent to the browser; only used by the dev register route |
+| Variable                               | Where used       | Notes                                                          |
+| -------------------------------------- | ---------------- | -------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`             | Browser + server | Project URL from Supabase dashboard                            |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Browser + server | Anon/public key — safe to expose                               |
+| `SUPABASE_SERVICE_ROLE_KEY`            | Server only      | Never sent to the browser; only used by the dev register route |
 
 ---
 
-*Last updated: 2026-11-01 (Sprint 4 — rewritten; no Express backend; all data access via Supabase JS SDK).*
+_Last updated: 2026-11-01 (Sprint 4 — rewritten; no Express backend; all data access via Supabase JS SDK)._

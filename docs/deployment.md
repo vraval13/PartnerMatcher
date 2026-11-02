@@ -9,11 +9,13 @@ PartnerMatcher is a Next.js + Supabase app. There is no separate backend server.
 ### One-time setup
 
 1. Install Vercel CLI:
+
    ```bash
    npm i -g vercel
    ```
 
 2. Link the project (from `frontend/`):
+
    ```bash
    cd frontend
    vercel link
@@ -35,14 +37,14 @@ Or connect the GitHub repo — Vercel auto-deploys on push to `main`.
 
 ### Build settings (Vercel dashboard)
 
-| Setting | Value |
-|---|---|
-| Framework Preset | Next.js |
-| Root Directory | `frontend` |
-| Build Command | `npm run build` |
-| Output Directory | `.next` |
-| Install Command | `npm install` |
-| Node.js Version | 20.x |
+| Setting          | Value           |
+| ---------------- | --------------- |
+| Framework Preset | Next.js         |
+| Root Directory   | `frontend`      |
+| Build Command    | `npm run build` |
+| Output Directory | `.next`         |
+| Install Command  | `npm install`   |
+| Node.js Version  | 20.x            |
 
 ---
 
@@ -84,6 +86,7 @@ SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
 ### Existing project (migrations)
 
 Run patches in order in **SQL Editor**:
+
 ```
 docs/sql/fix_profile_trigger.sql
 ```
@@ -115,8 +118,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
@@ -134,12 +137,15 @@ Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` as Git
 ## Rollback
 
 ### Frontend
+
 ```bash
 vercel rollback [deployment-url]
 ```
+
 Or in the Vercel dashboard: Deployments → find the last good deploy → Promote to Production.
 
 ### Database
+
 Before any migration, create a manual backup:
 Supabase Dashboard → Settings → Database → Backups → Create a backup.
 
@@ -152,4 +158,4 @@ Supabase Dashboard → Settings → Database → Backups → Create a backup.
 
 ---
 
-*Last updated: 2026-11-01 (Sprint 4 — Supabase-only architecture, no separate backend).*
+_Last updated: 2026-11-01 (Sprint 4 — Supabase-only architecture, no separate backend)._

@@ -53,14 +53,11 @@ export function Navbar() {
           </Link>
 
           {/* ── Center: Nav links ── */}
-          <div
-            className="hidden items-center gap-1 md:flex"
-            style={{ color: "var(--text-nav)" }}
-          >
+          <div className="hidden items-center gap-1 md:flex" style={{ color: "var(--text-nav)" }}>
             {[
-              { label: "Features",     href: "#features" },
+              { label: "Features", href: "#features" },
               { label: "How It Works", href: "#how-it-works" },
-              { label: "Docs",         href: "#partner-types" },
+              { label: "Docs", href: "#partner-types" },
             ].map((link) => (
               <a
                 key={link.label}

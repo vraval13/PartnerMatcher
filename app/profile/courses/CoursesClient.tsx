@@ -42,9 +42,7 @@ export function CoursesClient({
 
   function updateCourse(index: number, field: keyof Course, value: string) {
     setCourses((current) =>
-      current.map((course, i) =>
-        i === index ? { ...course, [field]: value } : course
-      )
+      current.map((course, i) => (i === index ? { ...course, [field]: value } : course))
     );
   }
 
@@ -78,9 +76,7 @@ export function CoursesClient({
       return;
     }
 
-    const incompleteCourse = validCourses.find(
-      (course) => !course.code.trim()
-    );
+    const incompleteCourse = validCourses.find((course) => !course.code.trim());
 
     if (incompleteCourse) {
       setError("Please enter a course code for every course.");
@@ -123,9 +119,7 @@ export function CoursesClient({
             .single();
 
           if (insertError || !newCourse) {
-            throw new Error(
-              insertError?.message ?? "Could not create the course."
-            );
+            throw new Error(insertError?.message ?? "Could not create the course.");
           }
 
           courseId = newCourse.id;
@@ -133,20 +127,18 @@ export function CoursesClient({
 
         savedCourseIds.push(courseId);
 
-        const { error: associationError } = await supabase
-          .from("user_courses")
-          .upsert(
-            {
-              user_id: userId,
-              course_id: courseId,
-              goal: course.goal,
-              semester: course.semester || "Fall 2026",
-            },
-            {
-              onConflict: "user_id,course_id,goal",
-              ignoreDuplicates: false,
-            }
-          );
+        const { error: associationError } = await supabase.from("user_courses").upsert(
+          {
+            user_id: userId,
+            course_id: courseId,
+            goal: course.goal,
+            semester: course.semester || "Fall 2026",
+          },
+          {
+            onConflict: "user_id,course_id,goal",
+            ignoreDuplicates: false,
+          }
+        );
 
         if (associationError) {
           throw new Error(associationError.message);
@@ -168,9 +160,7 @@ export function CoursesClient({
       setMessage("Your courses have been saved successfully.");
       router.refresh();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Something went wrong."
-      );
+      setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setSaving(false);
     }
@@ -179,8 +169,7 @@ export function CoursesClient({
   const inputClass =
     "mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-500 dark:focus:ring-indigo-500/10";
 
-  const labelClass =
-    "block text-sm font-medium text-slate-700 dark:text-slate-300";
+  const labelClass = "block text-sm font-medium text-slate-700 dark:text-slate-300";
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 transition-colors duration-300 dark:bg-[#08080f] dark:text-slate-100">
@@ -197,16 +186,8 @@ export function CoursesClient({
             <button
               type="button"
               onClick={toggle}
-              aria-label={
-                theme === "light"
-                  ? "Switch to dark mode"
-                  : "Switch to light mode"
-              }
-              title={
-                theme === "light"
-                  ? "Switch to dark mode"
-                  : "Switch to light mode"
-              }
+              aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+              title={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
               className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               {theme === "light" ? (
@@ -264,8 +245,7 @@ export function CoursesClient({
           </h1>
 
           <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-            Add, edit or remove courses to find students studying the same
-            subjects.
+            Add, edit or remove courses to find students studying the same subjects.
           </p>
         </div>
 
@@ -274,9 +254,7 @@ export function CoursesClient({
             <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
               Your university
             </p>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              {university}
-            </p>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{university}</p>
           </div>
 
           <span className="rounded-xl bg-indigo-50 px-3 py-2 text-sm font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
@@ -307,12 +285,9 @@ export function CoursesClient({
               <div className="space-y-4">
                 <label className={labelClass}>
                   Course name
-
                   <input
                     value={course.name}
-                    onChange={(e) =>
-                      updateCourse(index, "name", e.target.value)
-                    }
+                    onChange={(e) => updateCourse(index, "name", e.target.value)}
                     placeholder="e.g. Design and Analysis of Algorithms"
                     className={inputClass}
                   />
@@ -320,12 +295,9 @@ export function CoursesClient({
 
                 <label className={labelClass}>
                   Course code
-
                   <input
                     value={course.code}
-                    onChange={(e) =>
-                      updateCourse(index, "code", e.target.value)
-                    }
+                    onChange={(e) => updateCourse(index, "code", e.target.value)}
                     placeholder="e.g. CS-GY 6033"
                     className={inputClass}
                   />
@@ -333,12 +305,9 @@ export function CoursesClient({
 
                 <label className={labelClass}>
                   Study goal
-
                   <select
                     value={course.goal}
-                    onChange={(e) =>
-                      updateCourse(index, "goal", e.target.value)
-                    }
+                    onChange={(e) => updateCourse(index, "goal", e.target.value)}
                     className={inputClass}
                   >
                     {goals.map((goal) => (
