@@ -8,6 +8,10 @@ const now = new Date("2026-11-02T12:00:00Z");
 const stored = {
   id: goalId,
   user_id: id,
+  information_version: 1,
+  category: null,
+  subject_or_skill: null,
+  proficiency_level: null,
   mode: "course",
   display_name: "Kai",
   institution: "NYU",
@@ -71,6 +75,36 @@ test("US04/US05: anonymous search/list/save/archive return 401 before touching d
     await archiveGoal(client, request({ goal_id: goalId })),
   ])
     assert.equal(response.status, 401);
+});
+test("US-01: goal listing returns version-2 information fields", async () => {
+  const response = await listGoals(
+    db(() => [
+      {
+        ...stored,
+        information_version: 2,
+        category: "course",
+        subject_or_skill: "Data Structures",
+        proficiency_level: "advanced",
+      },
+    ])
+  );
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "private, no-store");
+  const data = await response.json();
+  assert.deepEqual(
+    {
+      information_version: data.goals[0].information_version,
+      category: data.goals[0].category,
+      subject_or_skill: data.goals[0].subject_or_skill,
+      proficiency_level: data.goals[0].proficiency_level,
+    },
+    {
+      information_version: 2,
+      category: "course",
+      subject_or_skill: "Data Structures",
+      proficiency_level: "advanced",
+    }
+  );
 });
 test("US04: owned goal search returns ranked score breakdown and no-store", async () => {
   const client = db((url) => {
@@ -157,6 +191,9 @@ test("saving uses atomic RPC with validated fields, never client-supplied owner"
     client,
     request({
       ...stored,
+      category: "course",
+      subject_or_skill: "React",
+      proficiency_level: "intermediate",
       availability: stored.matching_availability.map((s) => ({
         ...s,
         start_time: "14:00",
@@ -168,6 +205,118 @@ test("saving uses atomic RPC with validated fields, never client-supplied owner"
   );
   assert.equal(response.status, 201);
   assert.equal((await response.json()).id, goalId);
+});
+test("US-01: exam and skill saves do not send fake course fields", async () => {
+  for (const category of ["exam_prep", "skill_practice"]) {
+    const client = db((_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      assert.equal(body.payload.information_version, 2);
+      assert.equal(body.payload.category, category);
+      assert.equal(body.payload.mode, null);
+      assert.equal(body.payload.institution, null);
+      assert.equal(body.payload.course_code, null);
+      assert.equal(body.payload.topic, null);
+      return goalId;
+    });
+    const response = await saveGoal(
+      client,
+      request({
+        ...stored,
+        category,
+        subject_or_skill: category === "exam_prep" ? "Calculus exam" : "Japanese",
+        proficiency_level: "beginner",
+        mode: null,
+        institution: null,
+        course_code: null,
+        topic: null,
+        availability: stored.matching_availability.map((slot) => ({
+          ...slot,
+          start_time: "14:00",
+          end_time: "16:00",
+        })),
+      }),
+      now
+    );
+    assert.equal(response.status, 201);
+  }
+});
+test("US-01: save errors include a stable code and all missing information fields", async () => {
+  const response = await saveGoal(
+    db(() => {
+      throw new Error("Must not write");
+    }),
+    request({
+      ...stored,
+      category: "",
+      subject_or_skill: "",
+      proficiency_level: "",
+      location_preference: "",
+    }),
+    now
+  );
+  assert.equal(response.status, 422);
+  const data = await response.json();
+  assert.equal(data.code, "INVALID_MATCHING_INFORMATION");
+  assert.deepEqual(
+    data.field_errors.map((item: { field: string }) => item.field),
+    ["category", "subject_or_skill", "proficiency_level", "location_preference"]
+  );
+});
+test("timezone validation rejects fixed offsets before calling the RPC", async () => {
+  for (const timezone of ["+01:00", "-05:00"]) {
+    const response = await saveGoal(
+      db(() => {
+        throw new Error("Must not call RPC or write data");
+      }),
+      request({
+        ...stored,
+        category: "course",
+        subject_or_skill: "React",
+        proficiency_level: "intermediate",
+        timezone,
+        availability: stored.matching_availability.map((slot) => ({
+          ...slot,
+          start_time: "14:00",
+          end_time: "16:00",
+        })),
+      }),
+      now
+    );
+    assert.equal(response.status, 422);
+    const data = await response.json();
+    assert.equal(data.code, "INVALID_TIMEZONE");
+    assert.deepEqual(data.field_errors, [
+      {
+        field: "timezone",
+        code: "INVALID_VALUE",
+        message: "Use a supported IANA timezone such as America/New_York or UTC.",
+      },
+    ]);
+  }
+});
+test("US-01: exam and skill goals return unsupported-category without course matching", async () => {
+  for (const category of ["exam_prep", "skill_practice"]) {
+    const response = await findMatches(
+      db((url) => {
+        if (!url.searchParams.has("id")) throw new Error("Must not query candidates");
+        return {
+          ...stored,
+          information_version: 2,
+          category,
+          subject_or_skill: "Calculus",
+          proficiency_level: "beginner",
+          mode: null,
+          institution: null,
+          course_code: null,
+          topic: null,
+        };
+      }),
+      request({ goal_id: goalId }),
+      now
+    );
+    assert.equal(response.status, 422);
+    assert.equal((await response.json()).code, "UNSUPPORTED_MATCHING_CATEGORY");
+  }
 });
 test("database outage returns actionable 503 without raw database details", async () => {
   const response = await findMatches(
