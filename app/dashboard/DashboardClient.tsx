@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
@@ -57,12 +56,14 @@ function Icon({
           <path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42" />
         </svg>
       );
+
     case "moon":
       return (
         <svg {...common}>
           <path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5 8.5 8.5 0 1 0 20.5 14.5Z" />
         </svg>
       );
+
     case "school":
       return (
         <svg {...common}>
@@ -70,6 +71,7 @@ function Icon({
           <path d="M7 12.5v4c3 2 7 2 10 0v-4M21 10v6" />
         </svg>
       );
+
     case "book":
       return (
         <svg {...common}>
@@ -77,6 +79,7 @@ function Icon({
           <path d="M4 17.5A2.5 2.5 0 0 1 6.5 15H20M8 7h7" />
         </svg>
       );
+
     case "users":
       return (
         <svg {...common}>
@@ -85,6 +88,7 @@ function Icon({
           <path d="M20 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
         </svg>
       );
+
     case "edit":
       return (
         <svg {...common}>
@@ -92,12 +96,14 @@ function Icon({
           <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L9 17l-4 1 1-4Z" />
         </svg>
       );
+
     case "message":
       return (
         <svg {...common}>
           <path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5 9 9 0 0 1-4-.9L3 21l1.9-4.5a9 9 0 0 1-.9-4A8.5 8.5 0 0 1 12.5 4H13a8.5 8.5 0 0 1 8 7.5Z" />
         </svg>
       );
+
     default:
       return null;
   }
@@ -113,7 +119,10 @@ export function DashboardClient({
   courseCount: number;
 }) {
   const router = useRouter();
-  const supabase = createClient();I
+  const supabase = createClient();
+
+  const { theme, toggle } = useTheme();
+  const dark = theme === "dark";
 
   const displayName =
     user.user_metadata?.full_name ??
@@ -129,7 +138,7 @@ export function DashboardClient({
     .slice(0, 2);
 
   async function handleSignOut() {
-    await getSupabase().auth.signOut();
+    await supabase.auth.signOut();
     router.push("/signin");
     router.refresh();
   }
@@ -187,9 +196,7 @@ export function DashboardClient({
               <Icon name={dark ? "sun" : "moon"} size={19} />
             </button>
 
-            <div
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-800 dark:bg-slate-700 dark:text-white"
-            >
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-800 dark:bg-slate-700 dark:text-white">
               {initials}
             </div>
 
@@ -256,6 +263,7 @@ export function DashboardClient({
               <span className="text-sm font-medium" style={secondaryText}>
                 Courses added
               </span>
+
               <div
                 className="rounded-xl p-2.5"
                 style={{
@@ -288,6 +296,7 @@ export function DashboardClient({
               <span className="text-sm font-medium" style={secondaryText}>
                 University
               </span>
+
               <div
                 className="rounded-xl p-2.5"
                 style={{
@@ -311,11 +320,15 @@ export function DashboardClient({
             </p>
           </div>
 
-          <div className="rounded-2xl border p-5 sm:p-6 sm:col-span-2 lg:col-span-1" style={cardStyle}>
+          <div
+            className="rounded-2xl border p-5 sm:p-6 sm:col-span-2 lg:col-span-1"
+            style={cardStyle}
+          >
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium" style={secondaryText}>
                 Study level
               </span>
+
               <div
                 className="rounded-xl p-2.5"
                 style={{
@@ -379,10 +392,7 @@ export function DashboardClient({
                   {displayName}
                 </p>
 
-                <p
-                  className="mt-1 truncate text-xs"
-                  style={secondaryText}
-                >
+                <p className="mt-1 truncate text-xs" style={secondaryText}>
                   {user.email}
                 </p>
               </div>
