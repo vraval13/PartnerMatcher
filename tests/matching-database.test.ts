@@ -45,6 +45,12 @@ test("migration: actual Postgres constraints, transaction rollback and RLS permi
     };
     const own = await create(payload);
     assert.equal((await db.query("select * from public.matching_availability")).rows.length, 1);
+    const slot = (
+      await db.query<{ id: string }>(
+        "select id from public.matching_availability where goal_id=$1",
+        [own]
+      )
+    ).rows[0].id;
     await assert.rejects(
       create({
         ...payload,
@@ -82,6 +88,22 @@ test("migration: actual Postgres constraints, transaction rollback and RLS permi
         "insert into public.matching_availability(goal_id,weekday,start_time,end_time,timezone) values($1,1,'14:00','15:00','UTC')",
         [own]
       )
+    );
+    assert.equal(
+      (
+        await db.query(
+          "update public.matching_availability set start_time='15:00',end_time='16:00' where id=$1 returning id",
+          [slot]
+        )
+      ).rows.length,
+      0,
+      "Foreign availability updates blocked"
+    );
+    assert.equal(
+      (await db.query("delete from public.matching_availability where id=$1 returning id", [slot]))
+        .rows.length,
+      0,
+      "Foreign availability deletes blocked"
     );
     await db.exec(`set request.jwt.claim.sub='${alice}';`);
     await db.query("update public.matching_goals set is_listed=true where id=$1", [own]);

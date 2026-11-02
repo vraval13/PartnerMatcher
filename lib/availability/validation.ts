@@ -20,10 +20,7 @@ export function isValidIanaTimezone(value: string): boolean {
   const timezone = value.trim();
   if (!timezone) return false;
 
-  if (
-    typeof Intl === "undefined" ||
-    typeof Intl.DateTimeFormat !== "function"
-  ) {
+  if (typeof Intl === "undefined" || typeof Intl.DateTimeFormat !== "function") {
     return true;
   }
 
@@ -40,9 +37,7 @@ function timeToMinutes(value: string): number {
   return hours * 60 + minutes;
 }
 
-function normalizeSlot(
-  slot: WeeklyAvailabilityInput
-): WeeklyAvailabilityInput {
+function normalizeSlot(slot: WeeklyAvailabilityInput): WeeklyAvailabilityInput {
   return {
     dayOfWeek: slot.dayOfWeek,
     startTime: slot.startTime.trim(),
@@ -117,8 +112,7 @@ export function validateWeeklyAvailability(
       errors.push({
         code: "cross_midnight_not_supported",
         field: "endTime",
-        message:
-          "Availability cannot cross midnight. Choose an end time later on the same day.",
+        message: "Availability cannot cross midnight. Choose an end time later on the same day.",
       });
     }
   }

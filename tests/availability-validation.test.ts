@@ -27,41 +27,19 @@ test("accepts a valid weekly availability window", () => {
 });
 
 test("rejects dayOfWeek values outside 0 through 6", () => {
-  assert.ok(
-    errorCodes({ ...validSlot, dayOfWeek: -1 }).includes(
-      "invalid_day_of_week"
-    )
-  );
-  assert.ok(
-    errorCodes({ ...validSlot, dayOfWeek: 7 }).includes(
-      "invalid_day_of_week"
-    )
-  );
-  assert.ok(
-    errorCodes({ ...validSlot, dayOfWeek: 1.5 }).includes(
-      "invalid_day_of_week"
-    )
-  );
+  assert.ok(errorCodes({ ...validSlot, dayOfWeek: -1 }).includes("invalid_day_of_week"));
+  assert.ok(errorCodes({ ...validSlot, dayOfWeek: 7 }).includes("invalid_day_of_week"));
+  assert.ok(errorCodes({ ...validSlot, dayOfWeek: 1.5 }).includes("invalid_day_of_week"));
 });
 
 test("rejects an invalid 24-hour time format", () => {
-  assert.ok(
-    errorCodes({ ...validSlot, startTime: "9:30" }).includes(
-      "invalid_start_time"
-    )
-  );
-  assert.ok(
-    errorCodes({ ...validSlot, endTime: "24:00" }).includes(
-      "invalid_end_time"
-    )
-  );
+  assert.ok(errorCodes({ ...validSlot, startTime: "9:30" }).includes("invalid_start_time"));
+  assert.ok(errorCodes({ ...validSlot, endTime: "24:00" }).includes("invalid_end_time"));
 });
 
 test("rejects an end time equal to the start time", () => {
   assert.ok(
-    errorCodes({ ...validSlot, endTime: validSlot.startTime }).includes(
-      "end_not_after_start"
-    )
+    errorCodes({ ...validSlot, endTime: validSlot.startTime }).includes("end_not_after_start")
   );
 });
 
@@ -86,19 +64,11 @@ test("rejects a window that would cross midnight", () => {
 });
 
 test("rejects an empty timezone", () => {
-  assert.ok(
-    errorCodes({ ...validSlot, timezone: "  " }).includes(
-      "timezone_required"
-    )
-  );
+  assert.ok(errorCodes({ ...validSlot, timezone: "  " }).includes("timezone_required"));
 });
 
 test("rejects an invalid IANA timezone", () => {
-  assert.ok(
-    errorCodes({ ...validSlot, timezone: "Not/A_Timezone" }).includes(
-      "invalid_timezone"
-    )
-  );
+  assert.ok(errorCodes({ ...validSlot, timezone: "Not/A_Timezone" }).includes("invalid_timezone"));
 });
 
 test("detects a completely duplicate availability window", () => {
@@ -118,12 +88,6 @@ test("does not treat a partially overlapping window as a duplicate", () => {
     endTime: "12:00",
   };
 
-  assert.equal(
-    isDuplicateAvailabilitySlot(overlappingSlot, [validSlot]),
-    false
-  );
-  assert.equal(
-    validateWeeklyAvailability(overlappingSlot, [validSlot]).valid,
-    true
-  );
+  assert.equal(isDuplicateAvailabilitySlot(overlappingSlot, [validSlot]), false);
+  assert.equal(validateWeeklyAvailability(overlappingSlot, [validSlot]).valid, true);
 });

@@ -88,6 +88,14 @@ function Icon({ name, size = 20 }: { name: string; size?: number }) {
         </svg>
       );
 
+    case "clock":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3 2" />
+        </svg>
+      );
+
     default:
       return null;
   }
@@ -97,10 +105,12 @@ export function DashboardClient({
   user,
   profile,
   courseCount,
+  availabilityCount,
 }: {
   user: User;
   profile: ProfileSummary | null;
   courseCount: number;
+  availabilityCount: number;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -241,7 +251,7 @@ export function DashboardClient({
         </section>
 
         {/* Overview cards */}
-        <section className="mb-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <section className="mb-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-2xl border p-5 sm:p-6" style={cardStyle}>
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium" style={secondaryText}>
@@ -301,10 +311,7 @@ export function DashboardClient({
             </p>
           </div>
 
-          <div
-            className="rounded-2xl border p-5 sm:p-6 sm:col-span-2 lg:col-span-1"
-            style={cardStyle}
-          >
+          <div className="rounded-2xl border p-5 sm:p-6" style={cardStyle}>
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium" style={secondaryText}>
                 Study level
@@ -330,6 +337,39 @@ export function DashboardClient({
             <p className="mt-2 text-xs" style={secondaryText}>
               {profile?.major || "Programme not set"}
             </p>
+          </div>
+
+          <div className="rounded-2xl border p-5 sm:p-6" style={cardStyle}>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium" style={secondaryText}>
+                Availability
+              </span>
+
+              <div
+                className="rounded-xl p-2.5"
+                style={{
+                  backgroundColor: "var(--bg-row)",
+                  color: "var(--text-heading)",
+                }}
+              >
+                <Icon name="clock" />
+              </div>
+            </div>
+
+            <p
+              className="mt-5 text-3xl font-bold tracking-tight"
+              style={{ color: "var(--text-heading)" }}
+            >
+              {availabilityCount}
+            </p>
+
+            <Link
+              href="/availability"
+              className="mt-2 inline-block text-xs font-semibold underline-offset-4 hover:underline"
+              style={{ color: "var(--text-sub)" }}
+            >
+              {availabilityCount ? "Manage availability →" : "Set availability →"}
+            </Link>
           </div>
         </section>
 
@@ -475,7 +515,7 @@ export function DashboardClient({
             </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
               {
                 icon: "book",
@@ -488,6 +528,12 @@ export function DashboardClient({
                 title: "Study partners",
                 description: "Find students with similar interests",
                 href: "/partners",
+              },
+              {
+                icon: "clock",
+                title: "Availability",
+                description: "Manage weekly matching times",
+                href: "/availability",
               },
               {
                 icon: "message",

@@ -1,9 +1,9 @@
 export type DayOfWeek = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 /**
- * Database-independent input for one recurring weekly availability window.
- * Persistence identifiers and matching-goal relationships will be added only
- * after the team's Supabase migration is merged.
+ * Database-independent input used by availability forms and validation.
+ * Database identifiers and matching-goal relationships live in the separate
+ * persistence and API mapping types.
  */
 export type WeeklyAvailabilityInput = {
   dayOfWeek: number;
