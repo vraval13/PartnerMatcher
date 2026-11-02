@@ -1,4 +1,10 @@
 import { Temporal } from "@js-temporal/polyfill";
+import {
+  validateMatchingInformation,
+  type LocationPreference,
+  type MatchingCategory,
+  type ProficiencyLevel,
+} from "./information";
 
 export type Slot = {
   weekday: number;
@@ -7,15 +13,19 @@ export type Slot = {
   timezone: string;
 };
 export type GoalInput = {
-  mode: "course" | "assignment";
+  information_version?: 1 | 2;
+  category?: MatchingCategory | null;
+  subject_or_skill?: string | null;
+  proficiency_level?: ProficiencyLevel | null;
+  mode: "course" | "assignment" | null;
   display_name: string;
-  institution: string;
-  course_code: string;
-  topic: string;
+  institution: string | null;
+  course_code: string | null;
+  topic: string | null;
   assignment_id: string | null;
   due_date: string | null;
   timezone: string;
-  location_preference: "online" | "in_person" | "either";
+  location_preference: LocationPreference;
   location: string;
   is_listed: boolean;
   availability: Slot[];
@@ -39,8 +49,23 @@ export const DEFAULT_CONFIG: ScoringConfig = {
 };
 export const WEIGHTS = { topic: 0.4, availability: 0.35, location: 0.25 };
 export class ValidationError extends Error {}
-export function normalized(value: string) {
-  return value.trim().replace(/\s+/g, " ").toLowerCase();
+export class TimezoneValidationError extends ValidationError {
+  readonly code = "INVALID_TIMEZONE";
+  readonly field_errors = [
+    {
+      field: "timezone",
+      code: "INVALID_VALUE" as const,
+      message: "Use a supported IANA timezone such as America/New_York or UTC.",
+    },
+  ];
+
+  constructor() {
+    super("Use a supported IANA timezone such as America/New_York or UTC.");
+    this.name = "TimezoneValidationError";
+  }
+}
+export function normalized(value: string | null) {
+  return (value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
 }
 function text(value: unknown, name: string, max: number, required = true): string {
   if (typeof value !== "string" || value.length > max || (required && !value.trim()))
@@ -48,6 +73,8 @@ function text(value: unknown, name: string, max: number, required = true): strin
   return value.trim();
 }
 export function validZone(value: string) {
+  // Temporal accepts fixed offsets, but PostgreSQL pg_timezone_names does not.
+  if (/^[+-]\d{2}:\d{2}$/.test(value.trim())) return false;
   try {
     Temporal.Now.zonedDateTimeISO(value);
     return true;
@@ -66,10 +93,41 @@ export function validateGoal(raw: unknown, asOf = new Date()): GoalInput {
   if (!raw || typeof raw !== "object" || Array.isArray(raw))
     throw new ValidationError("A goal object is required.");
   const v = raw as Record<string, unknown>;
+  if (
+    v.information_version !== undefined &&
+    v.information_version !== 1 &&
+    v.information_version !== 2
+  )
+    throw new ValidationError("Invalid matching information version.");
+  const isVersion2 = v.information_version === 2;
+  const information = isVersion2 ? validateMatchingInformation(v) : null;
+  if (isVersion2 && information && information.category !== "course") {
+    const timezone = text(v.timezone, "timezone", 80);
+    if (!validZone(timezone)) throw new TimezoneValidationError();
+    const location = text(v.location ?? "", "location", 120, false);
+    if (typeof v.is_listed !== "boolean")
+      throw new ValidationError("Choose whether to list this goal.");
+    const availability = validateAvailability(v.availability);
+    return {
+      ...information,
+      mode: null,
+      display_name: text(v.display_name, "display name", 100),
+      institution: null,
+      course_code: null,
+      topic: null,
+      assignment_id: null,
+      due_date: null,
+      timezone,
+      location_preference: information.location_preference,
+      location,
+      is_listed: v.is_listed,
+      availability,
+    };
+  }
   if (v.mode !== "course" && v.mode !== "assignment")
     throw new ValidationError("Choose course or assignment.");
   const timezone = text(v.timezone, "timezone", 80);
-  if (!validZone(timezone)) throw new ValidationError("Use a valid IANA timezone.");
+  if (!validZone(timezone)) throw new TimezoneValidationError();
   const today = Temporal.Instant.from(asOf.toISOString())
     .toZonedDateTimeISO(timezone)
     .toPlainDate();
@@ -89,10 +147,33 @@ export function validateGoal(raw: unknown, asOf = new Date()): GoalInput {
     throw new ValidationError("An in-person location is required.");
   if (typeof v.is_listed !== "boolean")
     throw new ValidationError("Choose whether to list this goal.");
-  if (!Array.isArray(v.availability) || v.availability.length < 1 || v.availability.length > 21)
+  const availability = validateAvailability(v.availability);
+  return {
+    ...(information ?? {
+      information_version: 1 as const,
+      category: null,
+      subject_or_skill: null,
+      proficiency_level: null,
+    }),
+    mode: v.mode,
+    display_name: text(v.display_name, "display name", 100),
+    institution: text(v.institution, "institution", 120),
+    course_code: text(v.course_code, "course code", 40),
+    topic: text(v.topic, "topic", 200),
+    assignment_id,
+    due_date,
+    timezone,
+    location_preference: v.location_preference as GoalInput["location_preference"],
+    location,
+    is_listed: v.is_listed,
+    availability,
+  };
+}
+function validateAvailability(value: unknown): Slot[] {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 21)
     throw new ValidationError("Add between 1 and 21 weekly availability slots.");
   const seen = new Set<string>();
-  const availability: Slot[] = v.availability.map((rawSlot: unknown) => {
+  return value.map((rawSlot: unknown) => {
     if (!rawSlot || typeof rawSlot !== "object")
       throw new ValidationError("Invalid availability slot.");
     const s = rawSlot as Record<string, unknown>;
@@ -118,20 +199,6 @@ export function validateGoal(raw: unknown, asOf = new Date()): GoalInput {
       timezone: zone,
     };
   });
-  return {
-    mode: v.mode,
-    display_name: text(v.display_name, "display name", 100),
-    institution: text(v.institution, "institution", 120),
-    course_code: text(v.course_code, "course code", 40),
-    topic: text(v.topic, "topic", 200),
-    assignment_id,
-    due_date,
-    timezone,
-    location_preference: v.location_preference as GoalInput["location_preference"],
-    location,
-    is_listed: v.is_listed,
-    availability,
-  };
 }
 type Interval = [number, number];
 function merge(intervals: Interval[]): Interval[] {

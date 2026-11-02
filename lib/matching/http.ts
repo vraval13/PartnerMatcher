@@ -1,14 +1,26 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { rankCandidates, validateGoal, ValidationError, type Goal, type Slot } from "./engine";
+import {
+  rankCandidates,
+  TimezoneValidationError,
+  validateGoal,
+  ValidationError,
+  type Goal,
+  type Slot,
+} from "./engine";
+import { MatchingInformationError } from "./information";
 
 type DBGoal = Omit<Goal, "availability"> & { matching_availability: Slot[] };
 const selection =
-  "id,user_id,mode,display_name,institution,course_code,topic,assignment_id,due_date,timezone,location_preference,location,is_listed,archived_at,matching_availability(weekday,start_time,end_time,timezone)";
+  "id,user_id,information_version,category,subject_or_skill,proficiency_level,mode,display_name,institution,course_code,topic,assignment_id,due_date,timezone,location_preference,location,is_listed,archived_at,matching_availability(weekday,start_time,end_time,timezone)";
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function goal(row: DBGoal): Goal {
   const { matching_availability, ...fields } = row;
   return {
     ...fields,
+    information_version: fields.information_version ?? 1,
+    category: fields.category ?? null,
+    subject_or_skill: fields.subject_or_skill ?? null,
+    proficiency_level: fields.proficiency_level ?? null,
     availability: matching_availability.map((s) => ({
       ...s,
       start_time: s.start_time.slice(0, 5),
@@ -23,10 +35,16 @@ export function reply(value: unknown, status = 200) {
   });
 }
 function failure(error: unknown): Response {
+  if (error instanceof MatchingInformationError)
+    return reply({ error: error.message, code: error.code, field_errors: error.field_errors }, 422);
+  if (error instanceof TimezoneValidationError)
+    return reply({ error: error.message, code: error.code, field_errors: error.field_errors }, 422);
   if (error instanceof ValidationError || error instanceof SyntaxError)
     return reply(
       {
         error: error instanceof SyntaxError ? "Invalid JSON body." : error.message,
+        code: error instanceof SyntaxError ? "INVALID_JSON" : "INVALID_GOAL",
+        field_errors: [],
       },
       422
     );
@@ -63,7 +81,13 @@ export async function saveGoal(db: SupabaseClient, request: Request, now = new D
   try {
     const id = await userId(db);
     if (!id) return reply({ error: "Sign in to save a matching goal." }, 401);
-    const input = validateGoal(await request.json(), now);
+    const body: unknown = await request.json();
+    const input = validateGoal(
+      body && typeof body === "object" && !Array.isArray(body)
+        ? { ...(body as Record<string, unknown>), information_version: 2 }
+        : body,
+      now
+    );
     const { data, error } = await db.rpc("create_matching_goal", {
       payload: input,
     });
@@ -110,6 +134,16 @@ export async function findMatches(db: SupabaseClient, request: Request, now = ne
     if (own.error) throw own.error;
     if (!own.data) return reply({ error: "Goal not found." }, 404);
     const query = goal(own.data as DBGoal);
+    if (query.information_version === 2 && query.category !== "course")
+      return reply(
+        {
+          error:
+            "Partner search is not available for this learning goal category yet. The goal is saved and ready for future matching support.",
+          code: "UNSUPPORTED_MATCHING_CATEGORY",
+          field_errors: [],
+        },
+        422
+      );
     validateGoal(query, now);
     let fetch = db
       .from("matching_goals")
@@ -118,12 +152,12 @@ export async function findMatches(db: SupabaseClient, request: Request, now = ne
       .is("archived_at", null)
       .neq("user_id", id)
       .eq("mode", query.mode)
-      .eq("institution_key", query.institution.trim().replace(/\s+/g, " ").toLowerCase())
-      .eq("course_key", query.course_code.trim().replace(/\s+/g, " ").toLowerCase());
+      .eq("institution_key", query.institution!.trim().replace(/\s+/g, " ").toLowerCase())
+      .eq("course_key", query.course_code!.trim().replace(/\s+/g, " ").toLowerCase());
     fetch =
       query.mode === "assignment"
         ? fetch.eq("assignment_id", query.assignment_id!)
-        : fetch.eq("topic_key", query.topic.trim().replace(/\s+/g, " ").toLowerCase());
+        : fetch.eq("topic_key", query.topic!.trim().replace(/\s+/g, " ").toLowerCase());
     // Fetch one over the supported cap; never silently rank an incomplete candidate set.
     const { data, error } = await fetch.order("id").limit(1000);
     if (error) throw error;

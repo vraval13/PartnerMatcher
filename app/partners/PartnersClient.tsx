@@ -2,9 +2,23 @@
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import type { Goal, GoalInput, rankCandidates, Slot } from "@/lib/matching/engine";
+import type {
+  MatchingCategory,
+  MatchingFieldError,
+  ProficiencyLevel,
+} from "@/lib/matching/information";
 type Match = ReturnType<typeof rankCandidates>[number];
 const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const categoryLabels: Record<MatchingCategory, string> = {
+  course: "Course study",
+  exam_prep: "Exam preparation",
+  skill_practice: "Skill / language practice",
+};
 const blank: GoalInput = {
+  information_version: 2,
+  category: "course",
+  subject_or_skill: "",
+  proficiency_level: "beginner",
   mode: "course",
   display_name: "",
   institution: "",
@@ -26,13 +40,22 @@ const blank: GoalInput = {
   ],
 };
 const inputClass = "w-full rounded-lg border border-slate-500/40 bg-transparent px-3 py-2 mt-1";
+class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly fieldErrors: MatchingFieldError[] = []
+  ) {
+    super(message);
+  }
+}
 async function api(url: string, init?: RequestInit) {
   const response = await fetch(url, {
     ...init,
     headers: { "Content-Type": "application/json" },
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error ?? "Request failed. Please try again.");
+  if (!response.ok)
+    throw new ApiError(data.error ?? "Request failed. Please try again.", data.field_errors ?? []);
   return data;
 }
 export default function PartnersClient() {
@@ -41,6 +64,7 @@ export default function PartnersClient() {
   const [selected, setSelected] = useState("");
   const [matches, setMatches] = useState<Match[] | null>(null);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<MatchingFieldError[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -73,6 +97,7 @@ export default function PartnersClient() {
     event.preventDefault();
     setBusy(true);
     setError("");
+    setFieldErrors([]);
     setMessage("");
     try {
       const saved = await api("/api/v1/matching-goals", {
@@ -83,8 +108,13 @@ export default function PartnersClient() {
       setGoals(data.goals);
       setSelected(saved.id);
       setMatches(null);
-      setMessage("Goal saved. Select Find partners to search.");
+      setMessage(
+        form.category === "course"
+          ? "Goal saved. Select Find partners to search."
+          : "Matching information saved. Partner search for this category is planned for a later story."
+      );
     } catch (e) {
+      if (e instanceof ApiError) setFieldErrors(e.fieldErrors);
       setError(e instanceof Error ? e.message : "Unable to save.");
     } finally {
       setBusy(false);
@@ -130,22 +160,45 @@ export default function PartnersClient() {
   }
   function field(
     label: string,
-    key: "display_name" | "institution" | "course_code" | "topic" | "location" | "timezone",
-    max: number
+    key:
+      | "display_name"
+      | "institution"
+      | "course_code"
+      | "topic"
+      | "subject_or_skill"
+      | "location"
+      | "timezone",
+    max: number,
+    required = key !== "location"
   ) {
+    const fieldError = fieldErrors.find((item) => item.field === key);
     return (
       <label className="block text-sm">
         {label}
         <input
           className={inputClass}
-          required={key !== "location"}
+          required={required}
           maxLength={max}
-          value={form[key]}
+          value={form[key] ?? ""}
           onChange={(e) => change(key, e.target.value)}
+          aria-invalid={Boolean(fieldError)}
+          aria-describedby={fieldError ? `${key}-error` : undefined}
         />
+        {fieldError && (
+          <span id={`${key}-error`} className="mt-1 block text-xs text-red-500">
+            {fieldError.message}
+          </span>
+        )}
       </label>
     );
   }
+  function fieldError(name: string) {
+    const issue = fieldErrors.find((item) => item.field === name);
+    return issue ? <span className="mt-1 block text-xs text-red-500">{issue.message}</span> : null;
+  }
+  const selectedGoal = goals.find((goal) => goal.id === selected);
+  const selectedSupportsSearch =
+    !selectedGoal || selectedGoal.information_version === 1 || selectedGoal.category === "course";
   return (
     <main
       className="min-h-screen px-5 py-8"
@@ -157,8 +210,8 @@ export default function PartnersClient() {
         </Link>
         <h1 className="mt-5 text-3xl font-bold">Find a study partner</h1>
         <p className="mt-2 text-sm opacity-75">
-          Match by course topic or exact assignment. Availability is compared across time zones over
-          the next 14 days, ending at assignment deadlines.
+          Save course study, exam preparation, and skill or language practice matching information.
+          Partner search currently supports course topics and assignments only.
         </p>
         {error && (
           <p role="alert" className="mt-5 rounded-xl border border-red-400 bg-red-500/10 p-4">
@@ -175,54 +228,101 @@ export default function PartnersClient() {
             <h2 className="text-xl font-semibold">Create a matching goal</h2>
             <form onSubmit={save} className="mt-4 space-y-4">
               <label className="block text-sm">
-                Goal type
+                Learning goal category
                 <select
                   className={inputClass}
-                  value={form.mode}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      mode: e.target.value as GoalInput["mode"],
+                  value={form.category ?? ""}
+                  onChange={(e) => {
+                    const category = e.target.value as MatchingCategory;
+                    setForm((current) => ({
+                      ...current,
+                      category,
+                      mode: category === "course" ? "course" : null,
+                      institution: category === "course" ? current.institution : null,
+                      course_code: category === "course" ? current.course_code : null,
+                      topic: category === "course" ? current.topic : null,
                       assignment_id: null,
                       due_date: null,
-                    })
-                  }
+                    }));
+                    setFieldErrors([]);
+                  }}
+                  aria-invalid={fieldErrors.some((item) => item.field === "category")}
                 >
-                  <option value="course">Course study (US-04)</option>
-                  <option value="assignment">Assignment (US-05)</option>
+                  <option value="course">Course study</option>
+                  <option value="exam_prep">Exam preparation</option>
+                  <option value="skill_practice">Skill / language practice</option>
                 </select>
+                {fieldError("category")}
               </label>
               {field("Display name", "display_name", 100)}
-              {field("University / institution", "institution", 120)}
-              {field("Course code", "course_code", 40)}
-              {field("Course topic", "topic", 200)}
-              {form.mode === "assignment" && (
-                <>
+              {field("Subject or skill", "subject_or_skill", 120)}
+              <label className="block text-sm">
+                Proficiency level
+                <select
+                  className={inputClass}
+                  value={form.proficiency_level ?? ""}
+                  onChange={(e) => change("proficiency_level", e.target.value as ProficiencyLevel)}
+                  aria-invalid={fieldErrors.some((item) => item.field === "proficiency_level")}
+                >
+                  <option value="beginner">Beginner</option>
+                  <option value="intermediate">Intermediate</option>
+                  <option value="advanced">Advanced</option>
+                </select>
+                {fieldError("proficiency_level")}
+              </label>
+              {form.category === "course" && (
+                <div className="space-y-4 rounded-xl border border-slate-500/30 p-4">
                   <label className="block text-sm">
-                    Exact assignment ID (case-sensitive)
-                    <input
+                    Course goal type
+                    <select
                       className={inputClass}
-                      maxLength={100}
-                      required
-                      value={form.assignment_id ?? ""}
-                      onChange={(e) => change("assignment_id", e.target.value)}
-                    />
+                      value={form.mode ?? "course"}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          mode: e.target.value as GoalInput["mode"],
+                          assignment_id: null,
+                          due_date: null,
+                        })
+                      }
+                    >
+                      <option value="course">Course topic (US-04)</option>
+                      <option value="assignment">Assignment (US-05)</option>
+                    </select>
+                    {fieldError("mode")}
                   </label>
-                  <label className="block text-sm">
-                    Due date (YYYY-MM-DD, end of day in goal timezone)
-                    <input
-                      type="text"
-                      placeholder="YYYY-MM-DD"
-                      pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}"
-                      maxLength={10}
-                      title="Enter the due date in YYYY-MM-DD format."
-                      className={inputClass}
-                      required
-                      value={form.due_date ?? ""}
-                      onChange={(e) => change("due_date", e.target.value)}
-                    />
-                  </label>
-                </>
+                  {field("University / institution", "institution", 120)}
+                  {field("Course code", "course_code", 40)}
+                  {field("Course topic", "topic", 200)}
+                  {form.mode === "assignment" && (
+                    <>
+                      <label className="block text-sm">
+                        Exact assignment ID (case-sensitive)
+                        <input
+                          className={inputClass}
+                          maxLength={100}
+                          required
+                          value={form.assignment_id ?? ""}
+                          onChange={(e) => change("assignment_id", e.target.value)}
+                        />
+                      </label>
+                      <label className="block text-sm">
+                        Due date (YYYY-MM-DD, end of day in goal timezone)
+                        <input
+                          type="text"
+                          placeholder="YYYY-MM-DD"
+                          pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}"
+                          maxLength={10}
+                          title="Enter the due date in YYYY-MM-DD format."
+                          className={inputClass}
+                          required
+                          value={form.due_date ?? ""}
+                          onChange={(e) => change("due_date", e.target.value)}
+                        />
+                      </label>
+                    </>
+                  )}
+                </div>
               )}
               {field("Goal timezone (IANA, e.g. America/New_York)", "timezone", 80)}
               <label className="block text-sm">
@@ -241,6 +341,7 @@ export default function PartnersClient() {
                   <option value="in_person">In person</option>
                   <option value="either">Either</option>
                 </select>
+                {fieldError("location_preference")}
               </label>
               {form.location_preference !== "online" &&
                 field("Meeting location (required for in person)", "location", 120)}
@@ -334,8 +435,8 @@ export default function PartnersClient() {
                   checked={form.is_listed}
                   onChange={(e) => change("is_listed", e.target.checked)}
                 />
-                Let signed-in students find this goal and see my display name, study details, and
-                availability.
+                Make this matching information visible to signed-in students when the category’s
+                matching feature is available.
               </label>
               <button
                 disabled={busy || loading}
@@ -371,15 +472,17 @@ export default function PartnersClient() {
                     <option value="">Choose a saved goal</option>
                     {goals.map((g) => (
                       <option key={g.id} value={g.id}>
-                        {g.course_code} · {g.mode === "assignment" ? g.assignment_id : g.topic} ·{" "}
-                        {g.is_listed ? "Listed" : "Private"}
+                        {g.category && g.category !== "course"
+                          ? `${categoryLabels[g.category]} · ${g.subject_or_skill}`
+                          : `${categoryLabels.course} · ${g.course_code} · ${g.mode === "assignment" ? g.assignment_id : g.topic}`}{" "}
+                        · {g.is_listed ? "Listed" : "Private"}
                       </option>
                     ))}
                   </select>
                 </label>
                 <div className="flex gap-3 mt-3">
                   <button
-                    disabled={!selected || busy}
+                    disabled={!selected || busy || !selectedSupportsSearch}
                     onClick={search}
                     className="rounded-xl bg-indigo-600 px-4 py-2 text-white disabled:opacity-50"
                   >
@@ -393,12 +496,20 @@ export default function PartnersClient() {
                     Remove goal
                   </button>
                 </div>
+                {selectedGoal && !selectedSupportsSearch && (
+                  <p className="mt-3 text-sm opacity-75">
+                    Partner search for {categoryLabels[selectedGoal.category!]} is planned for a
+                    later story. Your matching information is saved.
+                  </p>
+                )}
               </>
             )}
-            <p className="mt-4 text-xs opacity-70">
-              Weights: topic 40% · availability 35% · location 25%. Assignment urgency proposal: ≤2
-              days ×1.2; ≤7 days ×1.1; otherwise ×1.0. Final scores may exceed 100.
-            </p>
+            {selectedGoal && selectedSupportsSearch && (
+              <p className="mt-4 text-xs opacity-70">
+                Weights: topic 40% · availability 35% · location 25%. Assignment urgency proposal:
+                ≤2 days ×1.2; ≤7 days ×1.1; otherwise ×1.0. Final scores may exceed 100.
+              </p>
+            )}
             {matches && matches.length > 0 && (
               <p className="mt-5 text-sm">Ranked by final compatibility score, highest first.</p>
             )}

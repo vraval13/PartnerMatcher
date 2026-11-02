@@ -25,5 +25,23 @@ export default async function DashboardPage() {
     .select("course_id", { count: "exact", head: true })
     .eq("user_id", user.id);
 
-  return <DashboardClient user={user} profile={profile ?? null} courseCount={courseCount ?? 0} />;
+  const { data: matchingGoals } = await supabase
+    .from("matching_goals")
+    .select("id, matching_availability(id)")
+    .eq("user_id", user.id)
+    .is("archived_at", null);
+
+  const availabilityCount = (matchingGoals ?? []).reduce((total, goal) => {
+    const slots = Array.isArray(goal.matching_availability) ? goal.matching_availability : [];
+    return total + slots.length;
+  }, 0);
+
+  return (
+    <DashboardClient
+      user={user}
+      profile={profile ?? null}
+      courseCount={courseCount ?? 0}
+      availabilityCount={availabilityCount}
+    />
+  );
 }

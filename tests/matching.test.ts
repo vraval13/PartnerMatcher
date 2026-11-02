@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { rankCandidates, validateGoal, type Goal } from "../lib/matching/engine";
+import { rankCandidates, validZone, validateGoal, type Goal } from "../lib/matching/engine";
 const now = new Date("2026-11-02T12:00:00Z"); // Monday, after New York DST transition.
 function goal(p: Partial<Goal> = {}): Goal {
   return {
@@ -30,6 +30,12 @@ function goal(p: Partial<Goal> = {}): Goal {
   };
 }
 const candidate = (p: Partial<Goal> = {}) => goal({ id: "a", user_id: p.id ?? "other", ...p });
+test("timezone validation matches PostgreSQL named timezone support", () => {
+  assert.equal(validZone("America/New_York"), true);
+  assert.equal(validZone("UTC"), true);
+  assert.equal(validZone("+01:00"), false);
+  assert.equal(validZone("-05:00"), false);
+});
 test("US04: descending score, components, approved weights, stable tie-breaker", () => {
   const results = rankCandidates(
     goal(),
