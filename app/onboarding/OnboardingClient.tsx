@@ -32,6 +32,14 @@ const COURSE_GOALS = [
 
 const YEARS = ["1st year", "2nd year", "3rd year", "4th year", "5th year", "Graduate", "PhD"];
 
+function currentSemester(): string {
+  const m = new Date().getMonth() + 1;
+  const y = new Date().getFullYear();
+  if (m <= 5) return `Spring ${y}`;
+  if (m <= 7) return `Summer ${y}`;
+  return `Fall ${y}`;
+}
+
 const TIMEZONES = [
   "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
   "Europe/London", "Europe/Paris", "Asia/Dubai", "Asia/Kolkata",
@@ -198,6 +206,7 @@ export function OnboardingClient({ user }: { user: User }) {
           study_style:   studyStyle,
           comm_pref:     commPref,
           timezone,
+          onboarded_at:  new Date().toISOString(),
         })
         .eq("user_id", user.id);
       setSaving(false);
@@ -224,19 +233,35 @@ export function OnboardingClient({ user }: { user: User }) {
 
     let savedCount = 0;
     for (const c of validCourses) {
-      const { data: courseRow, error: courseErr } = await getSupabase()
-        .from("courses")
-        .upsert(
-          { name: c.name.trim(), code: c.code.trim() || null, university: university.trim() },
-          { onConflict: "code,university", ignoreDuplicates: false }
-        )
-        .select("id")
-        .single();
+      const nameTrimmed = c.name.trim();
+      const codeValue = c.code.trim() || null;
+      const uniTrimmed = university.trim();
 
-      if (courseErr || !courseRow) continue;
+      // SELECT-first: partial unique index on (code, university) doesn't work with
+      // upsert onConflict when code IS NULL (NULLs never trigger unique conflicts).
+      let courseId: string | null = null;
+      const { data: existing } = await getSupabase()
+        .from("courses")
+        .select("id")
+        .ilike("name", nameTrimmed)
+        .ilike("university", uniTrimmed)
+        .maybeSingle();
+
+      if (existing) {
+        courseId = existing.id;
+      } else {
+        const { data: inserted } = await getSupabase()
+          .from("courses")
+          .insert({ name: nameTrimmed, code: codeValue, university: uniTrimmed })
+          .select("id")
+          .single();
+        courseId = inserted?.id ?? null;
+      }
+
+      if (!courseId) continue;
 
       const { error: ucErr } = await getSupabase().from("user_courses").upsert(
-        { user_id: user.id, course_id: courseRow.id, goal: c.goal, semester: "Fall 2026" },
+        { user_id: user.id, course_id: courseId, goal: c.goal, semester: currentSemester() },
         { onConflict: "user_id,course_id,goal", ignoreDuplicates: true }
       );
 
@@ -251,6 +276,7 @@ export function OnboardingClient({ user }: { user: User }) {
 
     router.push("/dashboard");
     router.refresh();
+    setLoading(false);
   }
 
   // ── Render ──────────────────────────────────────────────────────────────

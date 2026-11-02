@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
@@ -112,10 +113,7 @@ export function DashboardClient({
   courseCount: number;
 }) {
   const router = useRouter();
-  const supabase = createClient();
-  const { theme, toggle } = useTheme();
-
-  const dark = theme === "dark";
+  const supabase = createClient();I
 
   const displayName =
     user.user_metadata?.full_name ??
@@ -131,7 +129,7 @@ export function DashboardClient({
     .slice(0, 2);
 
   async function handleSignOut() {
-    await supabase.auth.signOut();
+    await getSupabase().auth.signOut();
     router.push("/signin");
     router.refresh();
   }

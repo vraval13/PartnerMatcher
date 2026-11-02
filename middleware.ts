@@ -40,11 +40,11 @@ export async function middleware(request: NextRequest) {
   if (user && (isDashboard || isAuthPage || isOnboarding)) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("university")
+      .select("onboarded_at")
       .eq("user_id", user.id)
       .single();
 
-    const onboarded = !!profile?.university;
+    const onboarded = !!profile?.onboarded_at;
 
     // Authenticated + not onboarded → send to /onboarding (unless already there)
     if (!onboarded && !isOnboarding) {

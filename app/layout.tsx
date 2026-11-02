@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PartnerMatcher — Find your study partner",
+  title: "PartnerMatcher — Find your study partner now!",
   description:
     "Discover compatible study partners based on your courses, learning goals, and availability. Make every study session more meaningful.",
 };
