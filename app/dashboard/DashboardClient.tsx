@@ -440,16 +440,16 @@ export function DashboardClient({
               </div>
 
               <h3 className="mt-5 text-base font-bold" style={{ color: "var(--text-heading)" }}>
-                Your matches are on their way
+                Find your next study partner
               </h3>
 
               <p className="mt-2 max-w-sm text-sm leading-6" style={secondaryText}>
-                You&apos;ve added {courseCount} course(s). Study partner suggestions will appear
-                here when matching becomes available.
+                Create a course or assignment goal and add your availability to find compatible
+                study partners.
               </p>
 
               <Link
-                href="/profile/courses"
+                href="/partners"
                 className="mt-5 rounded-xl border px-5 py-2.5 text-xs font-semibold transition hover:opacity-70"
                 style={{
                   backgroundColor: "var(--bg-btn-outline)",
@@ -457,7 +457,7 @@ export function DashboardClient({
                   color: "var(--text-btn-outline)",
                 }}
               >
-                Update my courses
+                Find partners
               </Link>
             </div>
           </div>
@@ -487,7 +487,7 @@ export function DashboardClient({
                 icon: "users",
                 title: "Study partners",
                 description: "Find students with similar interests",
-                href: "/dashboard",
+                href: "/partners",
               },
               {
                 icon: "message",

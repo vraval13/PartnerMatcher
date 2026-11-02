@@ -291,29 +291,49 @@ export function OnboardingClient({ user }: { user: User }) {
 
     let savedCount = 0;
     for (const c of validCourses) {
-      const nameTrimmed = c.name.trim();
-      const codeValue = c.code.trim() || null;
-      const uniTrimmed = university.trim();
+      const code = c.code.trim() || null;
+      const name = c.name.trim();
+      const uni = university.trim();
 
-      // SELECT-first: partial unique index on (code, university) doesn't work with
-      // upsert onConflict when code IS NULL (NULLs never trigger unique conflicts).
       let courseId: string | null = null;
-      const { data: existing } = await getSupabase()
-        .from("courses")
-        .select("id")
-        .ilike("name", nameTrimmed)
-        .ilike("university", uniTrimmed)
-        .maybeSingle();
 
-      if (existing) {
-        courseId = existing.id;
-      } else {
-        const { data: inserted } = await getSupabase()
+      if (code) {
+        // SELECT first — partial unique index (code,university WHERE code IS NOT NULL)
+        // cannot be used as a PostgREST onConflict target, so we do read-then-insert.
+        const { data: existing } = await getSupabase()
           .from("courses")
-          .insert({ name: nameTrimmed, code: codeValue, university: uniTrimmed })
           .select("id")
-          .single();
-        courseId = inserted?.id ?? null;
+          .eq("code", code)
+          .eq("university", uni)
+          .maybeSingle();
+        if (existing) {
+          courseId = existing.id;
+        } else {
+          const { data: inserted } = await getSupabase()
+            .from("courses")
+            .insert({ name, code, university: uni })
+            .select("id")
+            .maybeSingle();
+          courseId = inserted?.id ?? null;
+        }
+      } else {
+        // NULL code: match by name + university to avoid duplicates
+        const { data: existing } = await getSupabase()
+          .from("courses")
+          .select("id")
+          .ilike("name", name)
+          .ilike("university", uni)
+          .maybeSingle();
+        if (existing) {
+          courseId = existing.id;
+        } else {
+          const { data: inserted } = await getSupabase()
+            .from("courses")
+            .insert({ name, code: null, university: uni })
+            .select("id")
+            .maybeSingle();
+          courseId = inserted?.id ?? null;
+        }
       }
 
       if (!courseId) continue;
@@ -334,9 +354,9 @@ export function OnboardingClient({ user }: { user: User }) {
       return;
     }
 
+    setLoading(false);
     router.push("/dashboard");
     router.refresh();
-    setLoading(false);
   }
 
   // ── Render ──────────────────────────────────────────────────────────────
