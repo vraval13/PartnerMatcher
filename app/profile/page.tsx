@@ -8,7 +8,9 @@ import { ProfileClient } from "./ProfileClient";
 export default async function ProfilePage() {
   await connection();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) redirect("/signin");
 
   const { data: profile } = await supabase
@@ -24,10 +26,34 @@ export default async function ProfilePage() {
     .select("goal, semester, courses(name, code)")
     .eq("user_id", user.id);
 
-  const courses = (courseRows ?? []).map((row: { goal: string | null; semester: string | null; courses: { name: string | null; code: string | null } | { name: string | null; code: string | null }[] | null }) => {
-    const course = Array.isArray(row.courses) ? row.courses[0] : row.courses;
-    return course ? { name: course.name ?? "Course", code: course.code ?? "", goal: row.goal ?? "study", semester: row.semester ?? "" } : null;
-  }).filter(Boolean);
+  const courses = (courseRows ?? [])
+    .map(
+      (row: {
+        goal: string | null;
+        semester: string | null;
+        courses:
+          | { name: string | null; code: string | null }
+          | { name: string | null; code: string | null }[]
+          | null;
+      }) => {
+        const course = Array.isArray(row.courses) ? row.courses[0] : row.courses;
+        return course
+          ? {
+              name: course.name ?? "Course",
+              code: course.code ?? "",
+              goal: row.goal ?? "study",
+              semester: row.semester ?? "",
+            }
+          : null;
+      }
+    )
+    .filter(Boolean);
 
-  return <ProfileClient user={user} profile={profile ?? null} courses={courses as { name: string; code: string; goal: string; semester: string }[]} />;
+  return (
+    <ProfileClient
+      user={user}
+      profile={profile ?? null}
+      courses={courses as { name: string; code: string; goal: string; semester: string }[]}
+    />
+  );
 }

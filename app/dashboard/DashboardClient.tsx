@@ -15,28 +15,12 @@ type ProfileSummary = {
   timezone: string | null;
 };
 
-const yearLabels = [
-  "1st year",
-  "2nd year",
-  "3rd year",
-  "4th year",
-  "5th year",
-  "Graduate",
-  "PhD",
-];
+const yearLabels = ["1st year", "2nd year", "3rd year", "4th year", "5th year", "Graduate", "PhD"];
 
 const readable = (value: string | null | undefined) =>
-  value
-    ? value.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase())
-    : "Not set";
+  value ? value.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase()) : "Not set";
 
-function Icon({
-  name,
-  size = 20,
-}: {
-  name: string;
-  size?: number;
-}) {
+function Icon({ name, size = 20 }: { name: string; size?: number }) {
   const common = {
     width: size,
     height: size,
@@ -308,10 +292,7 @@ export function DashboardClient({
               </div>
             </div>
 
-            <p
-              className="mt-5 truncate text-lg font-bold"
-              style={{ color: "var(--text-heading)" }}
-            >
+            <p className="mt-5 truncate text-lg font-bold" style={{ color: "var(--text-heading)" }}>
               {profile?.university || "Not set"}
             </p>
 
@@ -340,12 +321,9 @@ export function DashboardClient({
               </div>
             </div>
 
-            <p
-              className="mt-5 text-lg font-bold"
-              style={{ color: "var(--text-heading)" }}
-            >
+            <p className="mt-5 text-lg font-bold" style={{ color: "var(--text-heading)" }}>
               {profile?.year_of_study
-                ? yearLabels[profile.year_of_study - 1] ?? "Not set"
+                ? (yearLabels[profile.year_of_study - 1] ?? "Not set")
                 : "Not set"}
             </p>
 
@@ -358,15 +336,9 @@ export function DashboardClient({
         {/* Main content */}
         <section className="grid gap-6 lg:grid-cols-5">
           {/* Student profile */}
-          <div
-            className="rounded-2xl border p-6 lg:col-span-2"
-            style={cardStyle}
-          >
+          <div className="rounded-2xl border p-6 lg:col-span-2" style={cardStyle}>
             <div className="flex items-center justify-between">
-              <h2
-                className="text-base font-bold"
-                style={{ color: "var(--text-heading)" }}
-              >
+              <h2 className="text-base font-bold" style={{ color: "var(--text-heading)" }}>
                 Your academic profile
               </h2>
 
@@ -385,10 +357,7 @@ export function DashboardClient({
               </div>
 
               <div className="min-w-0">
-                <p
-                  className="truncate text-sm font-bold"
-                  style={{ color: "var(--text-heading)" }}
-                >
+                <p className="truncate text-sm font-bold" style={{ color: "var(--text-heading)" }}>
                   {displayName}
                 </p>
 
@@ -405,7 +374,7 @@ export function DashboardClient({
                 [
                   "Year",
                   profile?.year_of_study
-                    ? yearLabels[profile.year_of_study - 1] ?? "Not set"
+                    ? (yearLabels[profile.year_of_study - 1] ?? "Not set")
                     : "Not set",
                 ],
                 ["Study style", readable(profile?.study_style)],
@@ -439,10 +408,7 @@ export function DashboardClient({
           >
             <div className="flex items-center justify-between">
               <div>
-                <h2
-                  className="text-base font-bold"
-                  style={{ color: "var(--text-heading)" }}
-                >
+                <h2 className="text-base font-bold" style={{ color: "var(--text-heading)" }}>
                   Suggested study partners
                 </h2>
 
@@ -473,19 +439,13 @@ export function DashboardClient({
                 <Icon name="users" size={27} />
               </div>
 
-              <h3
-                className="mt-5 text-base font-bold"
-                style={{ color: "var(--text-heading)" }}
-              >
+              <h3 className="mt-5 text-base font-bold" style={{ color: "var(--text-heading)" }}>
                 Your matches are on their way
               </h3>
 
-              <p
-                className="mt-2 max-w-sm text-sm leading-6"
-                style={secondaryText}
-              >
-                You've added {courseCount} course(s). Study partner
-                suggestions will appear here when matching becomes available.
+              <p className="mt-2 max-w-sm text-sm leading-6" style={secondaryText}>
+                You&apos;ve added {courseCount} course(s). Study partner suggestions will appear
+                here when matching becomes available.
               </p>
 
               <Link
@@ -506,10 +466,7 @@ export function DashboardClient({
         {/* Quick actions */}
         <section className="mt-8">
           <div className="mb-4">
-            <h2
-              className="text-base font-bold"
-              style={{ color: "var(--text-heading)" }}
-            >
+            <h2 className="text-base font-bold" style={{ color: "var(--text-heading)" }}>
               Quick access
             </h2>
 
@@ -555,10 +512,7 @@ export function DashboardClient({
                   <Icon name={action.icon} />
                 </div>
 
-                <h3
-                  className="mt-4 text-sm font-bold"
-                  style={{ color: "var(--text-heading)" }}
-                >
+                <h3 className="mt-4 text-sm font-bold" style={{ color: "var(--text-heading)" }}>
                   {action.title}
                 </h3>
 

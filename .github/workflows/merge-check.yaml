@@ -1,0 +1,51 @@
+name: Merge Check
+
+# Verifies that this branch still passes all checks after merging main into it.
+# Catches conflicts and integration failures before the PR is merged.
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  merge-check:
+    name: Compatibility with main
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Merge main into branch
+        run: |
+          git config user.email "ci@github.com"
+          git config user.name "CI"
+          git fetch origin main
+          git merge origin/main --no-edit
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Format check
+        run: bunx prettier --check .
+
+      - name: Lint check
+        run: bun run lint
+
+      - name: Build
+        # next build generates .next/types (LayoutProps, PageProps, etc.)
+        # which tsc --noEmit requires in the next step.
+        run: bun run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+      - name: Typecheck
+        run: bunx tsc --noEmit

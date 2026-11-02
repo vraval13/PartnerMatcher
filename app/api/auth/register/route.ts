@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const { data, error } = await admin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true,          // marks email as verified instantly
+      email_confirm: true, // marks email as verified instantly
       user_metadata: { full_name: name },
     });
 

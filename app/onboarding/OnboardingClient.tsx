@@ -8,26 +8,26 @@ import { createClient } from "@/lib/supabase/client";
 // ── Constants ───────────────────────────────────────────────────────────────
 
 const STUDY_STYLES = [
-  { value: "visual",      label: "Visual",      desc: "Diagrams, charts, colour-coding", icon: "👁️" },
-  { value: "auditory",    label: "Auditory",    desc: "Lectures, discussions, podcasts", icon: "🎧" },
-  { value: "reading",     label: "Reading",     desc: "Notes, textbooks, articles",      icon: "📖" },
-  { value: "kinesthetic", label: "Kinesthetic", desc: "Practice problems, hands-on",     icon: "✋" },
-  { value: "mixed",       label: "Mixed",       desc: "Combination of styles",           icon: "🔀" },
+  { value: "visual", label: "Visual", desc: "Diagrams, charts, colour-coding", icon: "👁️" },
+  { value: "auditory", label: "Auditory", desc: "Lectures, discussions, podcasts", icon: "🎧" },
+  { value: "reading", label: "Reading", desc: "Notes, textbooks, articles", icon: "📖" },
+  { value: "kinesthetic", label: "Kinesthetic", desc: "Practice problems, hands-on", icon: "✋" },
+  { value: "mixed", label: "Mixed", desc: "Combination of styles", icon: "🔀" },
 ] as const;
 
 const COMM_PREFS = [
-  { value: "video",     label: "Video call",    icon: "📹" },
-  { value: "chat",      label: "Text / chat",   icon: "💬" },
-  { value: "in_person", label: "In person",     icon: "🤝" },
-  { value: "mixed",     label: "No preference", icon: "🔀" },
+  { value: "video", label: "Video call", icon: "📹" },
+  { value: "chat", label: "Text / chat", icon: "💬" },
+  { value: "in_person", label: "In person", icon: "🤝" },
+  { value: "mixed", label: "No preference", icon: "🔀" },
 ] as const;
 
 const COURSE_GOALS = [
-  { value: "study",     label: "General study" },
-  { value: "exam_prep", label: "Exam prep"     },
-  { value: "project",   label: "Project"       },
-  { value: "tutoring",  label: "Tutoring"      },
-  { value: "general",   label: "Explore"       },
+  { value: "study", label: "General study" },
+  { value: "exam_prep", label: "Exam prep" },
+  { value: "project", label: "Project" },
+  { value: "tutoring", label: "Tutoring" },
+  { value: "general", label: "Explore" },
 ] as const;
 
 const YEARS = ["1st year", "2nd year", "3rd year", "4th year", "5th year", "Graduate", "PhD"];
@@ -41,23 +41,35 @@ function currentSemester(): string {
 }
 
 const TIMEZONES = [
-  "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
-  "Europe/London", "Europe/Paris", "Asia/Dubai", "Asia/Kolkata",
-  "Asia/Singapore", "Asia/Tokyo", "Australia/Sydney",
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "Europe/London",
+  "Europe/Paris",
+  "Asia/Dubai",
+  "Asia/Kolkata",
+  "Asia/Singapore",
+  "Asia/Tokyo",
+  "Australia/Sydney",
 ];
 
-interface CourseEntry { name: string; code: string; goal: string; }
+interface CourseEntry {
+  name: string;
+  code: string;
+  goal: string;
+}
 
 // ── Question metadata ────────────────────────────────────────────────────────
 
 const QUESTIONS = [
-  { q: "What university do you attend?",        sub: "Start typing your university name."                             },
-  { q: "What's your major or programme?",       sub: "e.g. Computer Science, Business, Engineering"                  },
-  { q: "What year are you in?",                 sub: "Select your current year of study."                            },
-  { q: "How do you learn best?",                sub: "We use this to find partners who complement your style."        },
-  { q: "How do you prefer to communicate?",     sub: "Pick what feels most natural to you."                          },
-  { q: "What timezone are you in?",             sub: "So we can suggest partners who match your schedule."           },
-  { q: "What courses are you taking?",          sub: "We'll match you with students in the same courses."            },
+  { q: "What university do you attend?", sub: "Start typing your university name." },
+  { q: "What's your major or programme?", sub: "e.g. Computer Science, Business, Engineering" },
+  { q: "What year are you in?", sub: "Select your current year of study." },
+  { q: "How do you learn best?", sub: "We use this to find partners who complement your style." },
+  { q: "How do you prefer to communicate?", sub: "Pick what feels most natural to you." },
+  { q: "What timezone are you in?", sub: "So we can suggest partners who match your schedule." },
+  { q: "What courses are you taking?", sub: "We'll match you with students in the same courses." },
 ] as const;
 
 const TOTAL_Q = QUESTIONS.length;
@@ -69,9 +81,26 @@ function Logo() {
     <div className="flex items-center gap-2.5">
       <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-100 border border-indigo-200">
         <svg width="15" height="12" viewBox="0 0 26 22" fill="none">
-          <path d="M1 17C1 9.268 6.373 3 13 3C19.627 3 25 9.268 25 17" stroke="#4338ca" strokeWidth="2.5" strokeLinecap="round"/>
-          <path d="M5 17C5 11.477 8.582 7 13 7C17.418 7 21 11.477 21 17" stroke="#4338ca" strokeWidth="2.5" strokeLinecap="round" opacity="0.65"/>
-          <path d="M9 17C9 13.686 10.791 11 13 11C15.209 11 17 13.686 17 17" stroke="#4338ca" strokeWidth="2.5" strokeLinecap="round" opacity="0.35"/>
+          <path
+            d="M1 17C1 9.268 6.373 3 13 3C19.627 3 25 9.268 25 17"
+            stroke="#4338ca"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          />
+          <path
+            d="M5 17C5 11.477 8.582 7 13 7C17.418 7 21 11.477 21 17"
+            stroke="#4338ca"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            opacity="0.65"
+          />
+          <path
+            d="M9 17C9 13.686 10.791 11 13 11C15.209 11 17 13.686 17 17"
+            stroke="#4338ca"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            opacity="0.35"
+          />
         </svg>
       </div>
       <span className="text-sm font-bold tracking-tight" style={{ color: "var(--text-heading)" }}>
@@ -81,7 +110,15 @@ function Logo() {
   );
 }
 
-function OkButton({ onClick, disabled, label = "OK" }: { onClick: () => void; disabled?: boolean; label?: string }) {
+function OkButton({
+  onClick,
+  disabled,
+  label = "OK",
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  label?: string;
+}) {
   return (
     <div className="mt-6 flex items-center gap-3">
       <button
@@ -96,7 +133,11 @@ function OkButton({ onClick, disabled, label = "OK" }: { onClick: () => void; di
         or press{" "}
         <kbd
           className="rounded border px-1.5 py-0.5 text-[10px] font-medium"
-          style={{ borderColor: "var(--border-card)", color: "var(--text-muted)", backgroundColor: "var(--bg-tag)" }}
+          style={{
+            borderColor: "var(--border-card)",
+            color: "var(--text-muted)",
+            backgroundColor: "var(--bg-tag)",
+          }}
         >
           Enter ↵
         </kbd>
@@ -131,10 +172,18 @@ function TextQuestion({
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onAdvance(); } }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            onAdvance();
+          }
+        }}
         placeholder={placeholder}
         className="w-full border-b-2 bg-transparent pb-3 text-xl outline-none transition-colors placeholder:opacity-25 sm:text-2xl"
-        style={{ borderColor: value ? "#6366f1" : "var(--border-card)", color: "var(--text-heading)" }}
+        style={{
+          borderColor: value ? "#6366f1" : "var(--border-card)",
+          color: "var(--text-heading)",
+        }}
       />
       <OkButton onClick={onAdvance} />
     </div>
@@ -152,20 +201,20 @@ export function OnboardingClient({ user }: { user: User }) {
   };
 
   // Navigation
-  const [qIdx, setQIdx]       = useState(0);
-  const [dir, setDir]         = useState<1 | -1>(1);
+  const [qIdx, setQIdx] = useState(0);
+  const [dir, setDir] = useState<1 | -1>(1);
   const [animKey, setAnimKey] = useState(0);
-  const [error, setError]     = useState("");
-  const [saving, setSaving]   = useState(false);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Field values
-  const [university,  setUniversity]  = useState("");
-  const [major,       setMajor]       = useState("");
+  const [university, setUniversity] = useState("");
+  const [major, setMajor] = useState("");
   const [yearOfStudy, setYearOfStudy] = useState("");
-  const [studyStyle,  setStudyStyle]  = useState("");
-  const [commPref,    setCommPref]    = useState("");
-  const [timezone,    setTimezone]    = useState(
+  const [studyStyle, setStudyStyle] = useState("");
+  const [commPref, setCommPref] = useState("");
+  const [timezone, setTimezone] = useState(
     Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York"
   );
   const [courses, setCourses] = useState<CourseEntry[]>([{ name: "", code: "", goal: "study" }]);
@@ -182,17 +231,20 @@ export function OnboardingClient({ user }: { user: User }) {
   }
 
   function validateCurrent(): string {
-    if (qIdx === 0 && !university.trim())  return "Please enter your university.";
-    if (qIdx === 1 && !major.trim())       return "Please enter your major or programme.";
-    if (qIdx === 2 && !yearOfStudy)        return "Please select your year of study.";
-    if (qIdx === 3 && !studyStyle)         return "Please choose a study style.";
-    if (qIdx === 4 && !commPref)           return "Please choose a communication preference.";
+    if (qIdx === 0 && !university.trim()) return "Please enter your university.";
+    if (qIdx === 1 && !major.trim()) return "Please enter your major or programme.";
+    if (qIdx === 2 && !yearOfStudy) return "Please select your year of study.";
+    if (qIdx === 3 && !studyStyle) return "Please choose a study style.";
+    if (qIdx === 4 && !commPref) return "Please choose a communication preference.";
     return "";
   }
 
   async function advance() {
     const err = validateCurrent();
-    if (err) { setError(err); return; }
+    if (err) {
+      setError(err);
+      return;
+    }
 
     // Save profile fields after the timezone question (before courses)
     if (qIdx === 5) {
@@ -200,17 +252,20 @@ export function OnboardingClient({ user }: { user: User }) {
       const { error: saveErr } = await getSupabase()
         .from("profiles")
         .update({
-          university:    university.trim(),
-          major:         major.trim(),
+          university: university.trim(),
+          major: major.trim(),
           year_of_study: YEARS.indexOf(yearOfStudy) + 1,
-          study_style:   studyStyle,
-          comm_pref:     commPref,
+          study_style: studyStyle,
+          comm_pref: commPref,
           timezone,
-          onboarded_at:  new Date().toISOString(),
+          onboarded_at: new Date().toISOString(),
         })
         .eq("user_id", user.id);
       setSaving(false);
-      if (saveErr) { setError("Failed to save your preferences. Please check your connection and try again."); return; }
+      if (saveErr) {
+        setError("Failed to save your preferences. Please check your connection and try again.");
+        return;
+      }
     }
 
     navigate(qIdx + 1, 1);
@@ -227,7 +282,10 @@ export function OnboardingClient({ user }: { user: User }) {
 
   async function handleFinish() {
     const validCourses = courses.filter((c) => c.name.trim());
-    if (validCourses.length === 0) { setError("Please add at least one course."); return; }
+    if (validCourses.length === 0) {
+      setError("Please add at least one course.");
+      return;
+    }
     setError("");
     setLoading(true);
 
@@ -260,10 +318,12 @@ export function OnboardingClient({ user }: { user: User }) {
 
       if (!courseId) continue;
 
-      const { error: ucErr } = await getSupabase().from("user_courses").upsert(
-        { user_id: user.id, course_id: courseId, goal: c.goal, semester: currentSemester() },
-        { onConflict: "user_id,course_id,goal", ignoreDuplicates: true }
-      );
+      const { error: ucErr } = await getSupabase()
+        .from("user_courses")
+        .upsert(
+          { user_id: user.id, course_id: courseId, goal: c.goal, semester: currentSemester() },
+          { onConflict: "user_id,course_id,goal", ignoreDuplicates: true }
+        );
 
       if (!ucErr) savedCount++;
     }
@@ -284,10 +344,15 @@ export function OnboardingClient({ user }: { user: User }) {
   const progress = ((qIdx + 1) / TOTAL_Q) * 100;
 
   return (
-    <div className="flex min-h-screen flex-col overflow-hidden" style={{ backgroundColor: "var(--bg-page)" }}>
-
+    <div
+      className="flex min-h-screen flex-col overflow-hidden"
+      style={{ backgroundColor: "var(--bg-page)" }}
+    >
       {/* ── Top progress bar ──────────────────────────────────────────── */}
-      <div className="fixed inset-x-0 top-0 z-50 h-[3px]" style={{ backgroundColor: "var(--border-card)" }}>
+      <div
+        className="fixed inset-x-0 top-0 z-50 h-[3px]"
+        style={{ backgroundColor: "var(--border-card)" }}
+      >
         <div
           className="h-full bg-indigo-500 transition-all duration-500 ease-out"
           style={{ width: `${progress}%` }}
@@ -320,13 +385,8 @@ export function OnboardingClient({ user }: { user: User }) {
       {/* ── Main ──────────────────────────────────────────────────────── */}
       <main className="flex flex-1 items-center justify-center px-6 pb-16 sm:px-10">
         <div className="w-full max-w-xl">
-
           {/* Animated question wrapper — key changes trigger the CSS animation */}
-          <div
-            key={animKey}
-            className={dir === 1 ? "slide-in-right" : "slide-in-left"}
-          >
-
+          <div key={animKey} className={dir === 1 ? "slide-in-right" : "slide-in-left"}>
             {/* Question label */}
             <div className="mb-7">
               <div className="mb-3 flex items-center gap-2">
@@ -334,13 +394,20 @@ export function OnboardingClient({ user }: { user: User }) {
                   {String(qIdx + 1).padStart(2, "0")}
                 </span>
                 <svg width="12" height="8" viewBox="0 0 14 10" fill="none" aria-hidden>
-                  <path d="M0 5H11M11 5L7.5 1.5M11 5L7.5 8.5" stroke="#6366f1" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path
+                    d="M0 5H11M11 5L7.5 1.5M11 5L7.5 8.5"
+                    stroke="#6366f1"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold leading-snug sm:text-3xl" style={{ color: "var(--text-heading)" }}>
-                {qIdx === 0
-                  ? `Hey ${displayName}! 👋 ${QUESTIONS[0].q}`
-                  : QUESTIONS[qIdx].q}
+              <h2
+                className="text-2xl font-bold leading-snug sm:text-3xl"
+                style={{ color: "var(--text-heading)" }}
+              >
+                {qIdx === 0 ? `Hey ${displayName}! 👋 ${QUESTIONS[0].q}` : QUESTIONS[qIdx].q}
               </h2>
               <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--text-muted)" }}>
                 {QUESTIONS[qIdx].sub}
@@ -358,7 +425,10 @@ export function OnboardingClient({ user }: { user: User }) {
             {qIdx === 0 && (
               <TextQuestion
                 value={university}
-                onChange={(v) => { setUniversity(v); setError(""); }}
+                onChange={(v) => {
+                  setUniversity(v);
+                  setError("");
+                }}
                 placeholder="New York University"
                 onAdvance={advance}
               />
@@ -368,7 +438,10 @@ export function OnboardingClient({ user }: { user: User }) {
             {qIdx === 1 && (
               <TextQuestion
                 value={major}
-                onChange={(v) => { setMajor(v); setError(""); }}
+                onChange={(v) => {
+                  setMajor(v);
+                  setError("");
+                }}
                 placeholder="Computer Science"
                 onAdvance={advance}
               />
@@ -386,8 +459,8 @@ export function OnboardingClient({ user }: { user: User }) {
                       className="rounded-2xl border p-4 text-left transition-all duration-150 hover:border-indigo-400"
                       style={{
                         backgroundColor: sel ? "rgba(99,102,241,0.09)" : "var(--bg-card)",
-                        borderColor:     sel ? "#6366f1"               : "var(--border-card)",
-                        boxShadow:       sel ? "0 0 0 3px rgba(99,102,241,0.15)" : "none",
+                        borderColor: sel ? "#6366f1" : "var(--border-card)",
+                        boxShadow: sel ? "0 0 0 3px rgba(99,102,241,0.15)" : "none",
                       }}
                     >
                       <span
@@ -414,8 +487,8 @@ export function OnboardingClient({ user }: { user: User }) {
                       className="flex items-center gap-4 rounded-2xl border p-4 text-left transition-all duration-150 hover:border-indigo-400"
                       style={{
                         backgroundColor: sel ? "rgba(99,102,241,0.09)" : "var(--bg-card)",
-                        borderColor:     sel ? "#6366f1"               : "var(--border-card)",
-                        boxShadow:       sel ? "0 0 0 3px rgba(99,102,241,0.15)" : "none",
+                        borderColor: sel ? "#6366f1" : "var(--border-card)",
+                        boxShadow: sel ? "0 0 0 3px rgba(99,102,241,0.15)" : "none",
                       }}
                     >
                       <span
@@ -425,10 +498,16 @@ export function OnboardingClient({ user }: { user: User }) {
                         {s.icon}
                       </span>
                       <div>
-                        <p className="text-sm font-semibold" style={{ color: sel ? "#6366f1" : "var(--text-sub)" }}>
+                        <p
+                          className="text-sm font-semibold"
+                          style={{ color: sel ? "#6366f1" : "var(--text-sub)" }}
+                        >
                           {s.label}
                         </p>
-                        <p className="text-xs leading-relaxed" style={{ color: "var(--text-muted)" }}>
+                        <p
+                          className="text-xs leading-relaxed"
+                          style={{ color: "var(--text-muted)" }}
+                        >
                           {s.desc}
                         </p>
                       </div>
@@ -450,12 +529,15 @@ export function OnboardingClient({ user }: { user: User }) {
                       className="flex flex-col items-center gap-3 rounded-2xl border p-6 text-center transition-all duration-150 hover:border-indigo-400"
                       style={{
                         backgroundColor: sel ? "rgba(99,102,241,0.09)" : "var(--bg-card)",
-                        borderColor:     sel ? "#6366f1"               : "var(--border-card)",
-                        boxShadow:       sel ? "0 0 0 3px rgba(99,102,241,0.15)" : "none",
+                        borderColor: sel ? "#6366f1" : "var(--border-card)",
+                        boxShadow: sel ? "0 0 0 3px rgba(99,102,241,0.15)" : "none",
                       }}
                     >
                       <span className="text-2xl">{c.icon}</span>
-                      <span className="text-sm font-semibold" style={{ color: sel ? "#6366f1" : "var(--text-sub)" }}>
+                      <span
+                        className="text-sm font-semibold"
+                        style={{ color: sel ? "#6366f1" : "var(--text-sub)" }}
+                      >
                         {c.label}
                       </span>
                     </button>
@@ -473,12 +555,14 @@ export function OnboardingClient({ user }: { user: User }) {
                   className="w-full rounded-2xl border px-5 py-4 text-sm outline-none transition-all focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
                   style={{
                     backgroundColor: "var(--bg-card)",
-                    borderColor:     "var(--border-card)",
-                    color:           "var(--text-heading)",
+                    borderColor: "var(--border-card)",
+                    color: "var(--text-heading)",
                   }}
                 >
                   {TIMEZONES.map((tz) => (
-                    <option key={tz} value={tz}>{tz.replace(/_/g, " ")}</option>
+                    <option key={tz} value={tz}>
+                      {tz.replace(/_/g, " ")}
+                    </option>
                   ))}
                 </select>
                 <div className="mt-6 flex items-center gap-3">
@@ -486,7 +570,10 @@ export function OnboardingClient({ user }: { user: User }) {
                     onClick={advance}
                     disabled={saving}
                     className="btn-glow flex items-center gap-2 rounded-2xl px-6 py-2.5 text-sm font-semibold transition-all disabled:opacity-50"
-                    style={{ backgroundColor: "var(--btn-primary-bg)", color: "var(--btn-primary-fg)" }}
+                    style={{
+                      backgroundColor: "var(--btn-primary-bg)",
+                      color: "var(--btn-primary-fg)",
+                    }}
                   >
                     {saving ? "Saving…" : "Continue"} →
                   </button>
@@ -507,7 +594,10 @@ export function OnboardingClient({ user }: { user: User }) {
                     <div
                       key={i}
                       className="rounded-2xl border p-4 space-y-3 transition-all"
-                      style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-card)" }}
+                      style={{
+                        backgroundColor: "var(--bg-card)",
+                        borderColor: "var(--border-card)",
+                      }}
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-indigo-500">
@@ -538,8 +628,8 @@ export function OnboardingClient({ user }: { user: User }) {
                         className="w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-all placeholder:opacity-35 focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
                         style={{
                           backgroundColor: "var(--bg-page)",
-                          borderColor:     "var(--border-card)",
-                          color:           "var(--text-heading)",
+                          borderColor: "var(--border-card)",
+                          color: "var(--text-heading)",
                         }}
                       />
 
@@ -558,8 +648,8 @@ export function OnboardingClient({ user }: { user: User }) {
                           className="w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-all placeholder:opacity-35 focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
                           style={{
                             backgroundColor: "var(--bg-page)",
-                            borderColor:     "var(--border-card)",
-                            color:           "var(--text-heading)",
+                            borderColor: "var(--border-card)",
+                            color: "var(--text-heading)",
                           }}
                         />
                         <select
@@ -574,12 +664,14 @@ export function OnboardingClient({ user }: { user: User }) {
                           className="min-w-[110px] rounded-xl border px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
                           style={{
                             backgroundColor: "var(--bg-page)",
-                            borderColor:     "var(--border-card)",
-                            color:           "var(--text-heading)",
+                            borderColor: "var(--border-card)",
+                            color: "var(--text-heading)",
                           }}
                         >
                           {COURSE_GOALS.map((g) => (
-                            <option key={g.value} value={g.value}>{g.label}</option>
+                            <option key={g.value} value={g.value}>
+                              {g.label}
+                            </option>
                           ))}
                         </select>
                       </div>
@@ -589,9 +681,7 @@ export function OnboardingClient({ user }: { user: User }) {
 
                 {courses.length < 5 && (
                   <button
-                    onClick={() =>
-                      setCourses((c) => [...c, { name: "", code: "", goal: "study" }])
-                    }
+                    onClick={() => setCourses((c) => [...c, { name: "", code: "", goal: "study" }])}
                     className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed py-3 text-sm font-medium transition-all hover:border-indigo-400 hover:text-indigo-500"
                     style={{ borderColor: "var(--border-card)", color: "var(--text-muted)" }}
                   >
@@ -603,7 +693,10 @@ export function OnboardingClient({ user }: { user: User }) {
                   onClick={handleFinish}
                   disabled={loading}
                   className="btn-glow mt-5 w-full rounded-2xl py-3.5 text-sm font-semibold transition-all disabled:opacity-50"
-                  style={{ backgroundColor: "var(--btn-primary-bg)", color: "var(--btn-primary-fg)" }}
+                  style={{
+                    backgroundColor: "var(--btn-primary-bg)",
+                    color: "var(--btn-primary-fg)",
+                  }}
                 >
                   {loading ? "Setting up your profile…" : "Go to dashboard 🎉"}
                 </button>
