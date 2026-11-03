@@ -1,6 +1,23 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+/**
+ * Pure routing decision — no I/O. Returns the redirect path or null (allow).
+ * Exported so the routing rules can be unit-tested without a Next.js environment.
+ */
+export function resolveRoute(user: boolean, onboarded: boolean, pathname: string): string | null {
+  const isAuthPage = pathname === "/signin" || pathname === "/signup";
+  const isDashboard = pathname.startsWith("/dashboard");
+  const isOnboarding = pathname.startsWith("/onboarding");
+
+  if (!user && (isDashboard || isOnboarding)) return "/signin";
+  if (user && (isDashboard || isAuthPage || isOnboarding)) {
+    if (!onboarded && !isOnboarding) return "/onboarding";
+    if (onboarded && (isAuthPage || isOnboarding)) return "/dashboard";
+  }
+  return null;
+}
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -29,18 +46,18 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
   const { pathname } = request.nextUrl;
 
-  const isAuthPage = pathname === "/signin" || pathname === "/signup";
-  const isDashboard = pathname.startsWith("/dashboard");
-  const isOnboarding = pathname.startsWith("/onboarding");
-
-  // No user — protect dashboard + onboarding
-  if (!user && (isDashboard || isOnboarding)) {
+  // Fast path: no user — decide without a DB round-trip
+  const fastRedirect = resolveRoute(!!user, true, pathname);
+  if (!user && fastRedirect) {
     const url = request.nextUrl.clone();
-    url.pathname = "/signin";
+    url.pathname = fastRedirect;
     return NextResponse.redirect(url);
   }
 
   // User exists — check onboarding state for relevant routes
+  const isAuthPage = pathname === "/signin" || pathname === "/signup";
+  const isDashboard = pathname.startsWith("/dashboard");
+  const isOnboarding = pathname.startsWith("/onboarding");
   if (user && (isDashboard || isAuthPage || isOnboarding)) {
     const { data: profile } = await supabase
       .from("profiles")
@@ -49,18 +66,10 @@ export async function middleware(request: NextRequest) {
       .single();
 
     const onboarded = !!profile?.onboarded_at;
-
-    // Authenticated + not onboarded → send to /onboarding (unless already there)
-    if (!onboarded && !isOnboarding) {
+    const redirect = resolveRoute(true, onboarded, pathname);
+    if (redirect) {
       const url = request.nextUrl.clone();
-      url.pathname = "/onboarding";
-      return NextResponse.redirect(url);
-    }
-
-    // Authenticated + onboarded → send away from auth/onboarding pages
-    if (onboarded && (isAuthPage || isOnboarding)) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
+      url.pathname = redirect;
       return NextResponse.redirect(url);
     }
   }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { classifySignInError } from "@/lib/auth/errors";
 
 function SignInForm() {
   const router = useRouter();
@@ -30,11 +31,7 @@ function SignInForm() {
     setError("");
     const { error } = await getSupabase().auth.signInWithPassword({ email, password });
     if (error) {
-      if (error.message.toLowerCase().includes("email not confirmed")) {
-        setError("Please confirm your email address before signing in. Check your inbox.");
-      } else {
-        setError("Credentials are incorrect. Please try again.");
-      }
+      setError(classifySignInError(error.message));
       setLoading(false);
     } else {
       router.push("/dashboard");
