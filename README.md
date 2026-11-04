@@ -11,19 +11,27 @@ PartnerMatcher is a full-stack web application built for NYU Software Engineerin
 ### Prerequisites
 
 - Node.js ≥ 20
-- npm ≥ 10
+- Bun ≥ 1.0 (package manager — project uses `bun.lock`)
 
 ### Install and run
 
 ```bash
-npm ci
+bun install
 cp .env.example .env.local
-npm run dev        # http://localhost:3000
-npm run build      # production build
-npm run lint       # ESLint
+bun run dev        # http://localhost:3000
+bun run build      # production build
+bun run lint       # ESLint
+bunx prettier --check .   # format check
 ```
 
-Configure the team's Supabase URL and publishable key in `.env.local`, then open http://localhost:3000. Do not commit `.env.local` or place a service-role/provider secret in a `NEXT_PUBLIC` variable. OAuth providers and email confirmation are configured in Supabase Authentication, not by a frontend environment flag.
+Configure the team's Supabase URL and publishable key in `.env.local`, then open http://localhost:3000.
+
+> **Security rules:**
+>
+> - Never commit `.env.local` or any `.env*` file
+> - Never place `SUPABASE_SERVICE_ROLE_KEY` in a `NEXT_PUBLIC_` variable
+> - OAuth providers and email confirmation are configured in Supabase Authentication, not by a frontend flag
+> - `docs/sql/` is gitignored — it contains the full schema with sensitive structure
 
 ---
 
@@ -31,33 +39,46 @@ Configure the team's Supabase URL and publishable key in `.env.local`, then open
 
 ```
 PartnerMatcher/
-├── app/                       # Next.js 16 App Router
-│   ├── components/            # Shared UI components
-│   │   ├── ThemeProvider.tsx
-│   │   └── ScrollAnimations.tsx
-│   ├── dashboard/             # /dashboard route
-│   ├── onboarding/            # /onboarding route
-│   ├── profile/               # /profile + /profile/courses
-│   ├── signin/                # /signin route
-│   ├── signup/                # /signup route
-│   ├── auth/callback/         # OAuth callback handler
-│   ├── api/auth/register/     # Dev-only admin register route
-│   ├── globals.css            # Tailwind v4 + CSS token system
-│   └── layout.tsx             # Root layout + ThemeProvider
+├── app/                            # Next.js 16 App Router
+│   ├── components/                 # Shared UI components
+│   │   ├── ThemeProvider.tsx       # Dark/light theme context + toggle
+│   │   └── ScrollAnimations.tsx   # IntersectionObserver scroll-reveal
+│   ├── dashboard/                  # /dashboard route
+│   ├── onboarding/                 # /onboarding route (7-step wizard)
+│   ├── profile/                    # /profile + /profile/courses
+│   ├── signin/                     # /signin route
+│   ├── signup/                     # /signup route
+│   ├── auth/callback/              # OAuth code exchange handler
+│   ├── api/auth/register/          # Dev-only admin register route (404 in prod)
+│   ├── globals.css                 # Tailwind v4 + CSS token system + keyframes
+│   └── layout.tsx                  # Root layout + ThemeProvider
 ├── lib/
-│   ├── supabase/              # Browser, server, admin clients
-│   ├── matching/              # Matching engine (US-04 / US-05)
-│   └── onboarding/            # Course save helper
-├── docs/                      # Project documentation
-│   ├── skills.md
-│   ├── architecture.md
-│   ├── database.md
-│   ├── api.md
-│   ├── features.md
-│   ├── deployment.md
-│   ├── contributing.md
-│   └── changelog.md
-└── README.md
+│   ├── supabase/                   # Browser, server, admin clients
+│   │   ├── client.ts               # createBrowserClient (Client Components)
+│   │   ├── server.ts               # createServerClient cookie-based (Server Components)
+│   │   └── admin.ts                # Service-role client (dev only, never browser)
+│   ├── auth/
+│   │   └── errors.ts               # classifySignInError() — maps Supabase errors to user copy
+│   ├── matching/                   # Matching engine (US-04 / US-05)
+│   └── onboarding/                 # Course save helper
+├── middleware.ts                   # Session check + onboarding guard (every request)
+├── tests/                          # Node.js built-in test runner (tsx --test)
+│   ├── auth-callback.test.ts       # US-22: safeNext open-redirect, OAuth callback
+│   ├── auth-register.test.ts       # US-22: register route, duplicate email, prod guard
+│   ├── middleware-routing.test.ts  # US-22 / US-23: routing rules, all guard states
+│   ├── signin-errors.test.ts       # US-22: error message classification
+│   ├── availability-http.test.ts   # US-02: availability slot HTTP handler
+│   ├── availability-validation.test.ts  # US-02: time / timezone / day-of-week rules
+│   ├── matching.test.ts            # US-04 / US-05: matching engine logic
+│   ├── matching-http.test.ts       # US-04 / US-05: match API HTTP handler
+│   ├── matching-database.test.ts   # US-04 / US-05: RLS integration
+│   ├── matching-information.test.ts # US-01: goal creation validation
+│   └── onboarding-courses.test.ts  # US-23: course upsert logic
+├── .github/workflows/
+│   ├── ci.yaml                     # Format → lint → build → typecheck on every push/PR
+│   └── merge-check.yaml            # Same checks after merging main (PR gate)
+├── docs/                           # Project documentation
+└── supabase/                       # Supabase config + migrations
 ```
 
 ---
@@ -82,11 +103,16 @@ PartnerMatcher/
 | Layer           | Technology                              |
 | --------------- | --------------------------------------- |
 | Framework       | Next.js 16 (App Router, Turbopack)      |
-| Language        | TypeScript 5                            |
+| Language        | TypeScript 5 (strict mode)              |
 | Styling         | Tailwind CSS v4 + CSS custom properties |
 | Runtime         | React 19                                |
 | Auth & Database | Supabase (PostgreSQL 15 + RLS)          |
 | Sessions        | `@supabase/ssr` cookie-based sessions   |
+| Package manager | Bun                                     |
+| Linter          | ESLint (Next.js config)                 |
+| Formatter       | Prettier                                |
+| Test runner     | Node.js built-in (`tsx --test`)         |
+| CI              | GitHub Actions                          |
 | Icons           | Inline SVG                              |
 | Fonts           | Geist Sans / Geist Mono                 |
 
@@ -94,43 +120,114 @@ PartnerMatcher/
 
 ## Current Pages
 
-| Route              | Description                                                                       |
-| ------------------ | --------------------------------------------------------------------------------- |
-| `/signin`          | Two-column sign-in with GitHub/Google OAuth + email/password                      |
-| `/signup`          | Registration with email or OAuth                                                  |
-| `/onboarding`      | 7-step wizard: university, major, year, study style, comm pref, timezone, courses |
-| `/dashboard`       | Profile overview, course count, suggested partners                                |
-| `/profile`         | Full profile editor                                                               |
-| `/profile/courses` | Add/remove courses                                                                |
+| Route              | Description                                                                        |
+| ------------------ | ---------------------------------------------------------------------------------- |
+| `/`                | Landing page — hero, features, how-it-works, CTA, footer                           |
+| `/signin`          | Two-column sign-in: GitHub/Google OAuth + email/password                           |
+| `/signup`          | Registration with email or OAuth; confirmation-email sent state                    |
+| `/onboarding`      | 7-step wizard: university, major, year, study style, comm pref, timezone, courses  |
+| `/dashboard`       | Profile overview, course count, suggested partners                                 |
+| `/profile`         | Full profile editor                                                                |
+| `/profile/courses` | Add/remove courses with goal and semester                                          |
+| `/auth/callback`   | OAuth code exchange — validates `next` param, redirects to dashboard or onboarding |
 
 ---
 
-## Matching database setup
+## CI / CD
 
-The migration is `supabase/migrations/20261101014529_course_assignment_matching.sql`. It creates two matching tables, RLS policies and the atomic goal-creation RPC. It does not change existing team tables. Apply it once to the team's project via Supabase SQL Editor, or your normal reviewed Supabase migration workflow. Do not replay a manually applied migration. This migration was applied to the team project `oavkbygekcbotrsztfxu` on October 31, 2026 (New York time); the CLI filename uses UTC. Live transactional RPC and RLS checks passed. SQL Editor execution does not register Supabase CLI migration history; reconcile history before later CLI pushes.
+Two GitHub Actions workflows run on every push and pull request:
 
-**Candidate capacity:** the implementation supports 999 eligible goals and requests 1,000 to detect overflow, matching the default Supabase Data API row cap. Lower project caps require lowering both application limits.
+**`ci.yaml`** — runs on every branch:
 
-No production demo users/data are inserted. Register two team test accounts, complete onboarding, and explicitly create listed matching goals at `/partners`. Empty databases correctly show no matches. The matching engine does not infer goals from onboarding courses.
+1. Format check (`bunx prettier --check .`)
+2. Lint (`bun run lint`)
+3. Build (`bun run build`) — generates `.next/types` required for typecheck
+4. Typecheck (`bunx tsc --noEmit`)
 
-## Onboarding course-save repair
+**`merge-check.yaml`** — runs on PRs targeting `main`:
 
-`supabase/migrations/20261101020059_onboarding_course_insert.sql` adds authenticated INSERT permission for valid course catalog entries. Existing catalog rows cannot be overwritten by onboarding; duplicate retries reuse their IDs. Apply this migration once after the matching migration. It was applied to the team database on October 31, 2026 (New York time). The actual onboarding save was retried successfully and reached the dashboard. All 23 tests, lint and production build passed.
+- Fetches and merges `origin/main` before running the same four checks, so integration failures are caught before the PR lands
+
+The build step must come before the typecheck step because Next.js 16 generates `LayoutProps`, `PageProps`, and other route types in `.next/types/routes.d.ts` at build time.
 
 ---
 
-## Verify
+## Automated Tests
 
-```sh
-npm test
-npm run lint
-npm run build
-npm start
+```bash
+npm test   # or: bun run test
 ```
 
-Tests use a fixed clock, stubbed HTTP/auth, and embedded PostgreSQL (PGlite); they require no production credentials and do not write to the team database. Production starts on port 3000 by default.
+Tests use stubbed HTTP/auth, embedded PostgreSQL (PGlite), and a fixed clock. They require no production credentials and do not write to the team database.
 
-See [US-04 / US-05 design, API contracts, decisions and demo](docs/US04-US05-design.md). Deadline urgency bands are proposed and need team agreement. A story remains In progress until teammate PR review, merge, passing tests and deployed acceptance checks are complete.
+| Test file                               | Stories      | What it covers                                                                                                                                                                                                                         | Tests |
+| --------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| `tests/matching.test.ts`                | US-04, US-05 | Matching engine: topic, availability, location scoring; urgency multiplier; no-match empty result; self-exclusion; archived/private exclusion                                                                                          | 13    |
+| `tests/matching-http.test.ts`           | US-04, US-05 | POST /api/v1/matches: 200 ranked results; 401 unauthenticated; 404 unknown goal; 422 invalid input; capacity overflow                                                                                                                  | 13    |
+| `tests/matching-database.test.ts`       | US-04, US-05 | RLS: owner reads own private goal; peer reads only listed goals; owner-only writes; ownership cannot be reassigned                                                                                                                     | 1     |
+| `tests/matching-information.test.ts`    | US-01        | Goal creation: valid submission saved; missing field returns validation error; unsupported value returns validation error                                                                                                              | 6     |
+| `tests/availability-http.test.ts`       | US-02        | POST/DELETE availability slots: valid slot saved; missing field rejected; end ≤ start rejected; slot deleted; existing availability unchanged on error                                                                                 | 15    |
+| `tests/availability-validation.test.ts` | US-02        | Time format validation; IANA timezone validation; day-of-week validation; slot cap enforcement                                                                                                                                         | 12    |
+| `tests/onboarding-courses.test.ts`      | US-23        | Course upsert: course saved and linked; zero-course submit blocked; duplicate retry reuses existing row                                                                                                                                | 2     |
+| `tests/auth-register.test.ts`           | US-22        | POST /api/auth/register: 201 on success with `email_confirm:true`; 400 on missing fields; 409 on duplicate email without leaking raw Supabase text; 404 production guard                                                               | 12    |
+| `tests/auth-callback.test.ts`           | US-22        | OAuth callback: `safeNext` open-redirect prevention (8 cases); `processCallback` happy path; missing/failed code redirects to signin without leaking internal error detail                                                             | 17    |
+| `tests/middleware-routing.test.ts`      | US-22, US-23 | Routing middleware: unauthenticated users blocked from `/dashboard` and `/onboarding`; not-yet-onboarded users redirected to `/onboarding`; onboarded users redirected away from auth and onboarding pages; prefix-matching edge cases | 20    |
+| `tests/signin-errors.test.ts`           | US-22        | `classifySignInError`: generic message for wrong credentials; unconfirmed email produces confirmation prompt; raw Supabase error text never shown to user                                                                              | 9     |
+
+**Total: 120 passing tests.** All tests cover at least one error, edge, or permission case as required by the definition of done.
+
+---
+
+## Database Migrations
+
+Apply migrations once to the team Supabase project via the SQL Editor or reviewed CLI workflow. Do not replay a manually applied migration.
+
+| Migration file                                  | Applied    | What it does                                                                                          |
+| ----------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------- |
+| `20261101014529_course_assignment_matching.sql` | 2026-10-31 | Creates matching tables, RLS policies, atomic goal-creation RPC                                       |
+| `20261101020059_onboarding_course_insert.sql`   | 2026-10-31 | Adds authenticated INSERT permission for course catalog entries; duplicate retries reuse existing IDs |
+
+**Candidate capacity:** supports 999 eligible goals; requests 1 000 to detect overflow, matching the default Supabase Data API row cap. Lower project caps require lowering both application limits.
+
+No demo users or data are inserted. Register two team test accounts, complete onboarding, and create listed matching goals at `/partners`. Empty databases correctly show no matches.
+
+---
+
+## Auth Architecture
+
+```
+Browser                 Next.js (Vercel)              Supabase
+  │                          │                             │
+  ├─ POST /api/auth/register ─►  processRegister()          │
+  │   (dev only; 404 in prod) │  → admin.createUser()  ────►│ email_confirm: true
+  │                          │                             │
+  ├─ POST /auth/v1/signup ───────────────────────────────►  │ sends confirmation email
+  │                          │                             │
+  ├─ GET /auth/callback?code ─►  processCallback()          │
+  │                          │  → exchangeCodeForSession()─►│
+  │                          │  safeNext() validates next   │
+  │                          │  redirects to /onboarding    │
+  │                          │                             │
+  ├─ Every request ──────────►  middleware.ts               │
+  │                          │  resolveRoute(user,          │
+  │                          │    onboarded, pathname)      │
+  │                          │  → reads profiles.onboarded_at│
+```
+
+`safeNext()` only allows paths starting with `/` and not `//`, preventing open-redirect attacks.
+
+---
+
+## Sprint History
+
+| Sprint           | Version | Key deliverables                                                                                                  |
+| ---------------- | ------- | ----------------------------------------------------------------------------------------------------------------- |
+| Sprint 1         | 0.1.0   | Dark/light theme system, landing page                                                                             |
+| Sprint 2         | 0.2.0   | 3D animations, scroll-reveal, floating navbar                                                                     |
+| Sprint 3         | 0.3.0   | Sign-in page, docs directory, README                                                                              |
+| Sprint 4         | 0.4.0   | Sign-up, OAuth, onboarding wizard, dashboard, middleware                                                          |
+| Sprint 4 (patch) | 0.5.0   | Schema hardening, SQL gitignore, docs reorganised                                                                 |
+| Sprint 5         | —       | CI workflows, test suite (US-22/US-23), auth hardening, error classification, production guard, open-redirect fix |
 
 ---
 
