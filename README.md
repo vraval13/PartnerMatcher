@@ -27,6 +27,7 @@ bunx prettier --check .   # format check
 Configure the team's Supabase URL and publishable key in `.env.local`, then open http://localhost:3000.
 
 > **Security rules:**
+>
 > - Never commit `.env.local` or any `.env*` file
 > - Never place `SUPABASE_SERVICE_ROLE_KEY` in a `NEXT_PUBLIC_` variable
 > - OAuth providers and email confirmation are configured in Supabase Authentication, not by a frontend flag
@@ -84,51 +85,51 @@ PartnerMatcher/
 
 ## Documentation
 
-| File | Purpose |
-|---|---|
-| [docs/skills.md](docs/skills.md) | Tech stack, required skills per role |
-| [docs/database.md](docs/database.md) | Full DB schema, ERD, migration strategy |
-| [docs/architecture.md](docs/architecture.md) | System design, component map, data flow |
-| [docs/api.md](docs/api.md) | Supabase clients, auth operations, RLS summary |
-| [docs/features.md](docs/features.md) | Feature specs, current state, roadmap |
-| [docs/deployment.md](docs/deployment.md) | Vercel, Docker, environment setup |
-| [docs/contributing.md](docs/contributing.md) | PR flow, commit conventions, branch rules |
-| [docs/changelog.md](docs/changelog.md) | Version history |
+| File                                         | Purpose                                        |
+| -------------------------------------------- | ---------------------------------------------- |
+| [docs/skills.md](docs/skills.md)             | Tech stack, required skills per role           |
+| [docs/database.md](docs/database.md)         | Full DB schema, ERD, migration strategy        |
+| [docs/architecture.md](docs/architecture.md) | System design, component map, data flow        |
+| [docs/api.md](docs/api.md)                   | Supabase clients, auth operations, RLS summary |
+| [docs/features.md](docs/features.md)         | Feature specs, current state, roadmap          |
+| [docs/deployment.md](docs/deployment.md)     | Vercel, Docker, environment setup              |
+| [docs/contributing.md](docs/contributing.md) | PR flow, commit conventions, branch rules      |
+| [docs/changelog.md](docs/changelog.md)       | Version history                                |
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 16 (App Router, Turbopack) |
-| Language | TypeScript 5 (strict mode) |
-| Styling | Tailwind CSS v4 + CSS custom properties |
-| Runtime | React 19 |
-| Auth & Database | Supabase (PostgreSQL 15 + RLS) |
-| Sessions | `@supabase/ssr` cookie-based sessions |
-| Package manager | Bun |
-| Linter | ESLint (Next.js config) |
-| Formatter | Prettier |
-| Test runner | Node.js built-in (`tsx --test`) |
-| CI | GitHub Actions |
-| Icons | Inline SVG |
-| Fonts | Geist Sans / Geist Mono |
+| Layer           | Technology                              |
+| --------------- | --------------------------------------- |
+| Framework       | Next.js 16 (App Router, Turbopack)      |
+| Language        | TypeScript 5 (strict mode)              |
+| Styling         | Tailwind CSS v4 + CSS custom properties |
+| Runtime         | React 19                                |
+| Auth & Database | Supabase (PostgreSQL 15 + RLS)          |
+| Sessions        | `@supabase/ssr` cookie-based sessions   |
+| Package manager | Bun                                     |
+| Linter          | ESLint (Next.js config)                 |
+| Formatter       | Prettier                                |
+| Test runner     | Node.js built-in (`tsx --test`)         |
+| CI              | GitHub Actions                          |
+| Icons           | Inline SVG                              |
+| Fonts           | Geist Sans / Geist Mono                 |
 
 ---
 
 ## Current Pages
 
-| Route | Description |
-|---|---|
-| `/` | Landing page — hero, features, how-it-works, CTA, footer |
-| `/signin` | Two-column sign-in: GitHub/Google OAuth + email/password |
-| `/signup` | Registration with email or OAuth; confirmation-email sent state |
-| `/onboarding` | 7-step wizard: university, major, year, study style, comm pref, timezone, courses |
-| `/dashboard` | Profile overview, course count, suggested partners |
-| `/profile` | Full profile editor |
-| `/profile/courses` | Add/remove courses with goal and semester |
-| `/auth/callback` | OAuth code exchange — validates `next` param, redirects to dashboard or onboarding |
+| Route              | Description                                                                        |
+| ------------------ | ---------------------------------------------------------------------------------- |
+| `/`                | Landing page — hero, features, how-it-works, CTA, footer                           |
+| `/signin`          | Two-column sign-in: GitHub/Google OAuth + email/password                           |
+| `/signup`          | Registration with email or OAuth; confirmation-email sent state                    |
+| `/onboarding`      | 7-step wizard: university, major, year, study style, comm pref, timezone, courses  |
+| `/dashboard`       | Profile overview, course count, suggested partners                                 |
+| `/profile`         | Full profile editor                                                                |
+| `/profile/courses` | Add/remove courses with goal and semester                                          |
+| `/auth/callback`   | OAuth code exchange — validates `next` param, redirects to dashboard or onboarding |
 
 ---
 
@@ -137,12 +138,14 @@ PartnerMatcher/
 Two GitHub Actions workflows run on every push and pull request:
 
 **`ci.yaml`** — runs on every branch:
+
 1. Format check (`bunx prettier --check .`)
 2. Lint (`bun run lint`)
 3. Build (`bun run build`) — generates `.next/types` required for typecheck
 4. Typecheck (`bunx tsc --noEmit`)
 
 **`merge-check.yaml`** — runs on PRs targeting `main`:
+
 - Fetches and merges `origin/main` before running the same four checks, so integration failures are caught before the PR lands
 
 The build step must come before the typecheck step because Next.js 16 generates `LayoutProps`, `PageProps`, and other route types in `.next/types/routes.d.ts` at build time.
@@ -157,19 +160,19 @@ npm test   # or: bun run test
 
 Tests use stubbed HTTP/auth, embedded PostgreSQL (PGlite), and a fixed clock. They require no production credentials and do not write to the team database.
 
-| Test file | Stories | What it covers | Tests |
-|---|---|---|---|
-| `tests/matching.test.ts` | US-04, US-05 | Matching engine: topic, availability, location scoring; urgency multiplier; no-match empty result; self-exclusion; archived/private exclusion | 13 |
-| `tests/matching-http.test.ts` | US-04, US-05 | POST /api/v1/matches: 200 ranked results; 401 unauthenticated; 404 unknown goal; 422 invalid input; capacity overflow | 13 |
-| `tests/matching-database.test.ts` | US-04, US-05 | RLS: owner reads own private goal; peer reads only listed goals; owner-only writes; ownership cannot be reassigned | 1 |
-| `tests/matching-information.test.ts` | US-01 | Goal creation: valid submission saved; missing field returns validation error; unsupported value returns validation error | 6 |
-| `tests/availability-http.test.ts` | US-02 | POST/DELETE availability slots: valid slot saved; missing field rejected; end ≤ start rejected; slot deleted; existing availability unchanged on error | 15 |
-| `tests/availability-validation.test.ts` | US-02 | Time format validation; IANA timezone validation; day-of-week validation; slot cap enforcement | 12 |
-| `tests/onboarding-courses.test.ts` | US-23 | Course upsert: course saved and linked; zero-course submit blocked; duplicate retry reuses existing row | 2 |
-| `tests/auth-register.test.ts` | US-22 | POST /api/auth/register: 201 on success with `email_confirm:true`; 400 on missing fields; 409 on duplicate email without leaking raw Supabase text; 404 production guard | 12 |
-| `tests/auth-callback.test.ts` | US-22 | OAuth callback: `safeNext` open-redirect prevention (8 cases); `processCallback` happy path; missing/failed code redirects to signin without leaking internal error detail | 17 |
-| `tests/middleware-routing.test.ts` | US-22, US-23 | Routing middleware: unauthenticated users blocked from `/dashboard` and `/onboarding`; not-yet-onboarded users redirected to `/onboarding`; onboarded users redirected away from auth and onboarding pages; prefix-matching edge cases | 20 |
-| `tests/signin-errors.test.ts` | US-22 | `classifySignInError`: generic message for wrong credentials; unconfirmed email produces confirmation prompt; raw Supabase error text never shown to user | 9 |
+| Test file                               | Stories      | What it covers                                                                                                                                                                                                                         | Tests |
+| --------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| `tests/matching.test.ts`                | US-04, US-05 | Matching engine: topic, availability, location scoring; urgency multiplier; no-match empty result; self-exclusion; archived/private exclusion                                                                                          | 13    |
+| `tests/matching-http.test.ts`           | US-04, US-05 | POST /api/v1/matches: 200 ranked results; 401 unauthenticated; 404 unknown goal; 422 invalid input; capacity overflow                                                                                                                  | 13    |
+| `tests/matching-database.test.ts`       | US-04, US-05 | RLS: owner reads own private goal; peer reads only listed goals; owner-only writes; ownership cannot be reassigned                                                                                                                     | 1     |
+| `tests/matching-information.test.ts`    | US-01        | Goal creation: valid submission saved; missing field returns validation error; unsupported value returns validation error                                                                                                              | 6     |
+| `tests/availability-http.test.ts`       | US-02        | POST/DELETE availability slots: valid slot saved; missing field rejected; end ≤ start rejected; slot deleted; existing availability unchanged on error                                                                                 | 15    |
+| `tests/availability-validation.test.ts` | US-02        | Time format validation; IANA timezone validation; day-of-week validation; slot cap enforcement                                                                                                                                         | 12    |
+| `tests/onboarding-courses.test.ts`      | US-23        | Course upsert: course saved and linked; zero-course submit blocked; duplicate retry reuses existing row                                                                                                                                | 2     |
+| `tests/auth-register.test.ts`           | US-22        | POST /api/auth/register: 201 on success with `email_confirm:true`; 400 on missing fields; 409 on duplicate email without leaking raw Supabase text; 404 production guard                                                               | 12    |
+| `tests/auth-callback.test.ts`           | US-22        | OAuth callback: `safeNext` open-redirect prevention (8 cases); `processCallback` happy path; missing/failed code redirects to signin without leaking internal error detail                                                             | 17    |
+| `tests/middleware-routing.test.ts`      | US-22, US-23 | Routing middleware: unauthenticated users blocked from `/dashboard` and `/onboarding`; not-yet-onboarded users redirected to `/onboarding`; onboarded users redirected away from auth and onboarding pages; prefix-matching edge cases | 20    |
+| `tests/signin-errors.test.ts`           | US-22        | `classifySignInError`: generic message for wrong credentials; unconfirmed email produces confirmation prompt; raw Supabase error text never shown to user                                                                              | 9     |
 
 **Total: 120 passing tests.** All tests cover at least one error, edge, or permission case as required by the definition of done.
 
@@ -179,10 +182,10 @@ Tests use stubbed HTTP/auth, embedded PostgreSQL (PGlite), and a fixed clock. Th
 
 Apply migrations once to the team Supabase project via the SQL Editor or reviewed CLI workflow. Do not replay a manually applied migration.
 
-| Migration file | Applied | What it does |
-|---|---|---|
-| `20261101014529_course_assignment_matching.sql` | 2026-10-31 | Creates matching tables, RLS policies, atomic goal-creation RPC |
-| `20261101020059_onboarding_course_insert.sql` | 2026-10-31 | Adds authenticated INSERT permission for course catalog entries; duplicate retries reuse existing IDs |
+| Migration file                                  | Applied    | What it does                                                                                          |
+| ----------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------- |
+| `20261101014529_course_assignment_matching.sql` | 2026-10-31 | Creates matching tables, RLS policies, atomic goal-creation RPC                                       |
+| `20261101020059_onboarding_course_insert.sql`   | 2026-10-31 | Adds authenticated INSERT permission for course catalog entries; duplicate retries reuse existing IDs |
 
 **Candidate capacity:** supports 999 eligible goals; requests 1 000 to detect overflow, matching the default Supabase Data API row cap. Lower project caps require lowering both application limits.
 
@@ -217,14 +220,14 @@ Browser                 Next.js (Vercel)              Supabase
 
 ## Sprint History
 
-| Sprint | Version | Key deliverables |
-|---|---|---|
-| Sprint 1 | 0.1.0 | Dark/light theme system, landing page |
-| Sprint 2 | 0.2.0 | 3D animations, scroll-reveal, floating navbar |
-| Sprint 3 | 0.3.0 | Sign-in page, docs directory, README |
-| Sprint 4 | 0.4.0 | Sign-up, OAuth, onboarding wizard, dashboard, middleware |
-| Sprint 4 (patch) | 0.5.0 | Schema hardening, SQL gitignore, docs reorganised |
-| Sprint 5 | — | CI workflows, test suite (US-22/US-23), auth hardening, error classification, production guard, open-redirect fix |
+| Sprint           | Version | Key deliverables                                                                                                  |
+| ---------------- | ------- | ----------------------------------------------------------------------------------------------------------------- |
+| Sprint 1         | 0.1.0   | Dark/light theme system, landing page                                                                             |
+| Sprint 2         | 0.2.0   | 3D animations, scroll-reveal, floating navbar                                                                     |
+| Sprint 3         | 0.3.0   | Sign-in page, docs directory, README                                                                              |
+| Sprint 4         | 0.4.0   | Sign-up, OAuth, onboarding wizard, dashboard, middleware                                                          |
+| Sprint 4 (patch) | 0.5.0   | Schema hardening, SQL gitignore, docs reorganised                                                                 |
+| Sprint 5         | —       | CI workflows, test suite (US-22/US-23), auth hardening, error classification, production guard, open-redirect fix |
 
 ---
 
