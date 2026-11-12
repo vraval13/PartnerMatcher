@@ -25,6 +25,14 @@ export default async function DashboardPage() {
     .select("course_id", { count: "exact", head: true })
     .eq("user_id", user.id);
 
+  const { data: pendingRequests } = await supabase
+    .from("connections")
+    .select("id, requester_id, session_topic, proposed_start, proposed_end, message, created_at")
+    .eq("receiver_id", user.id)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(10);
+
   const { data: matchingGoals } = await supabase
     .from("matching_goals")
     .select("id, matching_availability(id)")
@@ -42,6 +50,7 @@ export default async function DashboardPage() {
       profile={profile ?? null}
       courseCount={courseCount ?? 0}
       availabilityCount={availabilityCount}
+      pendingRequests={pendingRequests ?? []}
     />
   );
 }

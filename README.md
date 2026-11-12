@@ -50,6 +50,7 @@ PartnerMatcher/
 │   ├── signup/                     # /signup route
 │   ├── auth/callback/              # OAuth code exchange handler
 │   ├── api/auth/register/          # Dev-only admin register route (404 in prod)
+│   ├── api/v1/connections/         # US-08: POST — send a session connection request
 │   ├── globals.css                 # Tailwind v4 + CSS token system + keyframes
 │   └── layout.tsx                  # Root layout + ThemeProvider
 ├── lib/
@@ -60,6 +61,7 @@ PartnerMatcher/
 │   ├── auth/
 │   │   └── errors.ts               # classifySignInError() — maps Supabase errors to user copy
 │   ├── matching/                   # Matching engine (US-04 / US-05)
+│   ├── connections/                # US-08: connection request handler + eligibility check
 │   └── onboarding/                 # Course save helper
 ├── middleware.ts                   # Session check + onboarding guard (every request)
 ├── tests/                          # Node.js built-in test runner (tsx --test)
@@ -73,7 +75,8 @@ PartnerMatcher/
 │   ├── matching-http.test.ts       # US-04 / US-05: match API HTTP handler
 │   ├── matching-database.test.ts   # US-04 / US-05: RLS integration
 │   ├── matching-information.test.ts # US-01: goal creation validation
-│   └── onboarding-courses.test.ts  # US-23: course upsert logic
+│   ├── onboarding-courses.test.ts  # US-23: course upsert logic
+│   └── connections.test.ts         # US-08: connection request eligibility + HTTP handler
 ├── .github/workflows/
 │   ├── ci.yaml                     # Format → lint → build → typecheck on every push/PR
 │   └── merge-check.yaml            # Same checks after merging main (PR gate)
@@ -160,21 +163,22 @@ npm test   # or: bun run test
 
 Tests use stubbed HTTP/auth, embedded PostgreSQL (PGlite), and a fixed clock. They require no production credentials and do not write to the team database.
 
-| Test file                               | Stories      | What it covers                                                                                                                                                                                                                         | Tests |
-| --------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| `tests/matching.test.ts`                | US-04, US-05 | Matching engine: topic, availability, location scoring; urgency multiplier; no-match empty result; self-exclusion; archived/private exclusion                                                                                          | 13    |
-| `tests/matching-http.test.ts`           | US-04, US-05 | POST /api/v1/matches: 200 ranked results; 401 unauthenticated; 404 unknown goal; 422 invalid input; capacity overflow                                                                                                                  | 13    |
-| `tests/matching-database.test.ts`       | US-04, US-05 | RLS: owner reads own private goal; peer reads only listed goals; owner-only writes; ownership cannot be reassigned                                                                                                                     | 1     |
-| `tests/matching-information.test.ts`    | US-01        | Goal creation: valid submission saved; missing field returns validation error; unsupported value returns validation error                                                                                                              | 6     |
-| `tests/availability-http.test.ts`       | US-02        | POST/DELETE availability slots: valid slot saved; missing field rejected; end ≤ start rejected; slot deleted; existing availability unchanged on error                                                                                 | 15    |
-| `tests/availability-validation.test.ts` | US-02        | Time format validation; IANA timezone validation; day-of-week validation; slot cap enforcement                                                                                                                                         | 12    |
-| `tests/onboarding-courses.test.ts`      | US-23        | Course upsert: course saved and linked; zero-course submit blocked; duplicate retry reuses existing row                                                                                                                                | 2     |
-| `tests/auth-register.test.ts`           | US-22        | POST /api/auth/register: 201 on success with `email_confirm:true`; 400 on missing fields; 409 on duplicate email without leaking raw Supabase text; 404 production guard                                                               | 12    |
-| `tests/auth-callback.test.ts`           | US-22        | OAuth callback: `safeNext` open-redirect prevention (8 cases); `processCallback` happy path; missing/failed code redirects to signin without leaking internal error detail                                                             | 17    |
-| `tests/middleware-routing.test.ts`      | US-22, US-23 | Routing middleware: unauthenticated users blocked from `/dashboard` and `/onboarding`; not-yet-onboarded users redirected to `/onboarding`; onboarded users redirected away from auth and onboarding pages; prefix-matching edge cases | 20    |
-| `tests/signin-errors.test.ts`           | US-22        | `classifySignInError`: generic message for wrong credentials; unconfirmed email produces confirmation prompt; raw Supabase error text never shown to user                                                                              | 9     |
+| Test file                               | Stories      | What it covers                                                                                                                                                                                                                                  | Tests |
+| --------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| `tests/matching.test.ts`                | US-04, US-05 | Matching engine: topic, availability, location scoring; urgency multiplier; no-match empty result; self-exclusion; archived/private exclusion                                                                                                   | 13    |
+| `tests/matching-http.test.ts`           | US-04, US-05 | POST /api/v1/matches: 200 ranked results; 401 unauthenticated; 404 unknown goal; 422 invalid input; capacity overflow                                                                                                                           | 13    |
+| `tests/matching-database.test.ts`       | US-04, US-05 | RLS: owner reads own private goal; peer reads only listed goals; owner-only writes; ownership cannot be reassigned                                                                                                                              | 1     |
+| `tests/matching-information.test.ts`    | US-01        | Goal creation: valid submission saved; missing field returns validation error; unsupported value returns validation error                                                                                                                       | 6     |
+| `tests/availability-http.test.ts`       | US-02        | POST/DELETE availability slots: valid slot saved; missing field rejected; end ≤ start rejected; slot deleted; existing availability unchanged on error                                                                                          | 15    |
+| `tests/availability-validation.test.ts` | US-02        | Time format validation; IANA timezone validation; day-of-week validation; slot cap enforcement                                                                                                                                                  | 12    |
+| `tests/onboarding-courses.test.ts`      | US-23        | Course upsert: course saved and linked; zero-course submit blocked; duplicate retry reuses existing row                                                                                                                                         | 2     |
+| `tests/auth-register.test.ts`           | US-22        | POST /api/auth/register: 201 on success with `email_confirm:true`; 400 on missing fields; 409 on duplicate email without leaking raw Supabase text; 404 production guard                                                                        | 12    |
+| `tests/auth-callback.test.ts`           | US-22        | OAuth callback: `safeNext` open-redirect prevention (8 cases); `processCallback` happy path; missing/failed code redirects to signin without leaking internal error detail                                                                      | 17    |
+| `tests/middleware-routing.test.ts`      | US-22, US-23 | Routing middleware: unauthenticated users blocked from `/dashboard` and `/onboarding`; not-yet-onboarded users redirected to `/onboarding`; onboarded users redirected away from auth and onboarding pages; prefix-matching edge cases          | 20    |
+| `tests/signin-errors.test.ts`           | US-22        | `classifySignInError`: generic message for wrong credentials; unconfirmed email produces confirmation prompt; raw Supabase error text never shown to user                                                                                       | 9     |
+| `tests/connections.test.ts`             | US-08        | `isEligibleCandidate` unit tests (10); POST /api/v1/connections: 201 with id/topic/times; 401 unauthenticated; 404 goal not found; 422 missing/invalid fields, ineligible candidate (different topic/institution/self/not found); 409 duplicate | 32    |
 
-**Total: 120 passing tests.** All tests cover at least one error, edge, or permission case as required by the definition of done.
+**Total: 152 passing tests.** All tests cover at least one error, edge, or permission case as required by the definition of done.
 
 ---
 
@@ -182,10 +186,11 @@ Tests use stubbed HTTP/auth, embedded PostgreSQL (PGlite), and a fixed clock. Th
 
 Apply migrations once to the team Supabase project via the SQL Editor or reviewed CLI workflow. Do not replay a manually applied migration.
 
-| Migration file                                  | Applied    | What it does                                                                                          |
-| ----------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------- |
-| `20261101014529_course_assignment_matching.sql` | 2026-10-31 | Creates matching tables, RLS policies, atomic goal-creation RPC                                       |
-| `20261101020059_onboarding_course_insert.sql`   | 2026-10-31 | Adds authenticated INSERT permission for course catalog entries; duplicate retries reuse existing IDs |
+| Migration file                                  | Applied    | What it does                                                                                                        |
+| ----------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------- |
+| `20261101014529_course_assignment_matching.sql` | 2026-10-31 | Creates matching tables, RLS policies, atomic goal-creation RPC                                                     |
+| `20261101020059_onboarding_course_insert.sql`   | 2026-10-31 | Adds authenticated INSERT permission for course catalog entries; duplicate retries reuse existing IDs               |
+| `20261111000000_us08_connection_requests.sql`   | 2026-11-11 | Extends `connections` with `session_topic`, `proposed_start`, `proposed_end`; adds end-after-start check constraint |
 
 **Candidate capacity:** supports 999 eligible goals; requests 1 000 to detect overflow, matching the default Supabase Data API row cap. Lower project caps require lowering both application limits.
 
@@ -228,6 +233,7 @@ Browser                 Next.js (Vercel)              Supabase
 | Sprint 4         | 0.4.0   | Sign-up, OAuth, onboarding wizard, dashboard, middleware                                                          |
 | Sprint 4 (patch) | 0.5.0   | Schema hardening, SQL gitignore, docs reorganised                                                                 |
 | Sprint 5         | —       | CI workflows, test suite (US-22/US-23), auth hardening, error classification, production guard, open-redirect fix |
+| Sprint 6         | —       | US-08: connection request API — session proposal fields, eligibility check, duplicate guard; 32 new tests         |
 
 ---
 

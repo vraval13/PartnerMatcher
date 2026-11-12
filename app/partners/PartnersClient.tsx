@@ -68,6 +68,17 @@ export default function PartnersClient() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [connectTarget, setConnectTarget] = useState<Match | null>(null);
+  const [connectForm, setConnectForm] = useState({
+    session_topic: "",
+    proposed_start: "",
+    proposed_end: "",
+    message: "",
+  });
+  const [connectBusy, setConnectBusy] = useState(false);
+  const [connectError, setConnectError] = useState("");
+  const [connectFieldErrors, setConnectFieldErrors] = useState<MatchingFieldError[]>([]);
+  const [sentIds, setSentIds] = useState<Set<string>>(new Set());
   useEffect(() => {
     let live = true;
     api("/api/v1/matching-goals")
@@ -136,6 +147,44 @@ export default function PartnersClient() {
       setError(e instanceof Error ? e.message : "Unable to search.");
     } finally {
       setBusy(false);
+    }
+  }
+  function openConnect(m: Match) {
+    setConnectForm({
+      session_topic: m.topic ?? "",
+      proposed_start: "",
+      proposed_end: "",
+      message: "",
+    });
+    setConnectError("");
+    setConnectFieldErrors([]);
+    setConnectTarget(m);
+  }
+  async function sendRequest(e: FormEvent) {
+    e.preventDefault();
+    if (!connectTarget || !selected) return;
+    setConnectBusy(true);
+    setConnectError("");
+    setConnectFieldErrors([]);
+    try {
+      await api("/api/v1/connections", {
+        method: "POST",
+        body: JSON.stringify({
+          goal_id: selected,
+          candidate_goal_id: connectTarget.candidate_goal_id,
+          session_topic: connectForm.session_topic,
+          proposed_start: new Date(connectForm.proposed_start).toISOString(),
+          proposed_end: new Date(connectForm.proposed_end).toISOString(),
+          message: connectForm.message || undefined,
+        }),
+      });
+      setSentIds((prev) => new Set(prev).add(connectTarget!.candidate_goal_id));
+      setConnectTarget(null);
+    } catch (e) {
+      if (e instanceof ApiError) setConnectFieldErrors(e.fieldErrors);
+      setConnectError(e instanceof Error ? e.message : "Unable to send request.");
+    } finally {
+      setConnectBusy(false);
     }
   }
   async function remove(id: string) {
@@ -555,12 +604,153 @@ export default function PartnersClient() {
                   <p className="mt-2 text-xs opacity-60">
                     Times shown in your browser timezone. Scoring: {m.configuration_version}
                   </p>
+                  <div className="mt-4">
+                    {sentIds.has(m.candidate_goal_id) ? (
+                      <span className="inline-block rounded-xl border border-green-500/40 bg-green-600/20 px-4 py-2 text-sm text-green-400">
+                        Request sent
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => openConnect(m)}
+                        disabled={busy || connectBusy}
+                        className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                      >
+                        Send request
+                      </button>
+                    )}
+                  </div>
                 </article>
               ))}
             </div>
           </section>
         </div>
       </div>
+
+      {connectTarget && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="connect-heading"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.65)" }}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl p-6 shadow-2xl"
+            style={{ background: "var(--bg-page)", color: "var(--text-page)" }}
+          >
+            <div className="flex items-center justify-between">
+              <h2 id="connect-heading" className="text-lg font-bold">
+                Send connection request
+              </h2>
+              <button
+                type="button"
+                onClick={() => setConnectTarget(null)}
+                disabled={connectBusy}
+                className="text-2xl leading-none opacity-50 hover:opacity-100"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <p className="mt-1 text-sm opacity-70">
+              To: <strong>{connectTarget.display_name}</strong> · {connectTarget.course_code}
+            </p>
+            {connectError && (
+              <p
+                role="alert"
+                className="mt-3 rounded-xl border border-red-400 bg-red-500/10 p-3 text-sm"
+              >
+                {connectError}
+              </p>
+            )}
+            <form onSubmit={sendRequest} className="mt-4 space-y-4">
+              <label className="block text-sm">
+                Session topic
+                <input
+                  className={inputClass}
+                  required
+                  maxLength={200}
+                  placeholder="e.g. React Hooks deep dive"
+                  value={connectForm.session_topic}
+                  onChange={(e) => setConnectForm((f) => ({ ...f, session_topic: e.target.value }))}
+                  aria-invalid={connectFieldErrors.some((x) => x.field === "session_topic")}
+                />
+                {connectFieldErrors.find((x) => x.field === "session_topic") && (
+                  <span className="mt-1 block text-xs text-red-500">
+                    {connectFieldErrors.find((x) => x.field === "session_topic")!.message}
+                  </span>
+                )}
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block text-sm">
+                  Session start
+                  <input
+                    type="datetime-local"
+                    className={inputClass}
+                    required
+                    value={connectForm.proposed_start}
+                    onChange={(e) =>
+                      setConnectForm((f) => ({ ...f, proposed_start: e.target.value }))
+                    }
+                    aria-invalid={connectFieldErrors.some((x) => x.field === "proposed_start")}
+                  />
+                  {connectFieldErrors.find((x) => x.field === "proposed_start") && (
+                    <span className="mt-1 block text-xs text-red-500">
+                      {connectFieldErrors.find((x) => x.field === "proposed_start")!.message}
+                    </span>
+                  )}
+                </label>
+                <label className="block text-sm">
+                  Session end
+                  <input
+                    type="datetime-local"
+                    className={inputClass}
+                    required
+                    value={connectForm.proposed_end}
+                    onChange={(e) =>
+                      setConnectForm((f) => ({ ...f, proposed_end: e.target.value }))
+                    }
+                    aria-invalid={connectFieldErrors.some((x) => x.field === "proposed_end")}
+                  />
+                  {connectFieldErrors.find((x) => x.field === "proposed_end") && (
+                    <span className="mt-1 block text-xs text-red-500">
+                      {connectFieldErrors.find((x) => x.field === "proposed_end")!.message}
+                    </span>
+                  )}
+                </label>
+              </div>
+              <label className="block text-sm">
+                Message <span className="opacity-50">(optional, max 500 chars)</span>
+                <textarea
+                  className={inputClass}
+                  rows={3}
+                  maxLength={500}
+                  placeholder="Introduce yourself or suggest a meeting platform…"
+                  value={connectForm.message}
+                  onChange={(e) => setConnectForm((f) => ({ ...f, message: e.target.value }))}
+                />
+              </label>
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  disabled={connectBusy}
+                  className="flex-1 rounded-xl bg-indigo-600 px-4 py-2 font-semibold text-white disabled:opacity-50"
+                >
+                  {connectBusy ? "Sending…" : "Send request"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConnectTarget(null)}
+                  disabled={connectBusy}
+                  className="rounded-xl border border-slate-500/40 px-4 py-2 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
