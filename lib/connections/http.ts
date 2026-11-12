@@ -30,12 +30,25 @@ type GoalRow = {
   archived_at: string | null;
 };
 
-export type ConnectionStatus = "pending" | "accepted" | "rejected" | "blocked";
+// DB migration required before deploying: ALTER TYPE connection_status_enum ADD VALUE 'cancelled';
+export type ConnectionStatus = "pending" | "accepted" | "rejected" | "blocked" | "cancelled";
 
 export type ReceivedRequest = {
   id: string;
   requester_id: string;
   requester_display_name: string | null;
+  session_topic: string | null;
+  proposed_start: string | null;
+  proposed_end: string | null;
+  message: string | null;
+  status: ConnectionStatus;
+  created_at: string;
+};
+
+export type SentRequest = {
+  id: string;
+  receiver_id: string;
+  receiver_display_name: string | null;
   session_topic: string | null;
   proposed_start: string | null;
   proposed_end: string | null;
@@ -338,5 +351,118 @@ export async function getReceivedRequests(db: SupabaseClient): Promise<Response>
     return reply({ requests }, 200);
   } catch {
     return reply({ error: "Unable to load connection requests. Please try again later." }, 503);
+  }
+}
+
+// ── US-12: get sent requests ──────────────────────────────────────────────────
+
+export async function getSentRequests(db: SupabaseClient): Promise<Response> {
+  try {
+    const userId = await getAuthUserId(db);
+    if (!userId) return reply({ error: "Sign in to view sent requests." }, 401);
+
+    const { data: rows, error: connErr } = await db
+      .from("connections")
+      .select("id,receiver_id,session_topic,proposed_start,proposed_end,message,status,created_at")
+      .eq("requester_id", userId)
+      .order("created_at", { ascending: false });
+    if (connErr) throw connErr;
+
+    const receiverIds = [...new Set((rows ?? []).map((r) => r.receiver_id))];
+    const displayNames: Record<string, string> = {};
+    if (receiverIds.length > 0) {
+      const { data: goals } = await db
+        .from("matching_goals")
+        .select("user_id,display_name")
+        .in("user_id", receiverIds)
+        .is("archived_at", null);
+      (goals ?? []).forEach((g) => {
+        if (g.user_id && !displayNames[g.user_id]) displayNames[g.user_id] = g.display_name;
+      });
+    }
+
+    const requests: SentRequest[] = (rows ?? []).map((r) => ({
+      id: r.id,
+      receiver_id: r.receiver_id,
+      receiver_display_name: displayNames[r.receiver_id] ?? null,
+      session_topic: r.session_topic,
+      proposed_start: r.proposed_start,
+      proposed_end: r.proposed_end,
+      message: r.message,
+      status: r.status as ConnectionStatus,
+      created_at: r.created_at,
+    }));
+
+    return reply({ requests }, 200);
+  } catch {
+    return reply({ error: "Unable to load sent requests. Please try again later." }, 503);
+  }
+}
+
+// ── US-12: cancel a sent request ─────────────────────────────────────────────
+
+export async function cancelConnectionRequest(
+  db: SupabaseClient,
+  connectionId: string
+): Promise<Response> {
+  try {
+    if (!UUID.test(connectionId)) {
+      return reply({ error: "A valid connection ID is required.", code: "INVALID_INPUT" }, 422);
+    }
+
+    const userId = await getAuthUserId(db);
+    if (!userId) return reply({ error: "Sign in to cancel a connection request." }, 401);
+
+    // AC3: .eq("requester_id", userId) means other users' requests return 404
+    const { data: conn, error: fetchErr } = await db
+      .from("connections")
+      .select("id,status")
+      .eq("id", connectionId)
+      .eq("requester_id", userId)
+      .maybeSingle();
+    if (fetchErr) throw fetchErr;
+
+    if (!conn) return reply({ error: "Connection request not found." }, 404);
+
+    // AC2: only pending requests can be cancelled
+    if (conn.status !== "pending") {
+      return reply(
+        {
+          error: `This request has already been ${conn.status} and cannot be cancelled.`,
+          code: "NOT_CANCELLABLE",
+          current_status: conn.status,
+        },
+        409
+      );
+    }
+
+    // Guard with status=pending in UPDATE to handle the concurrent-accept race.
+    // If the row was accepted between the SELECT and UPDATE, maybeSingle() returns null.
+    const { data: updated, error: updateErr } = await db
+      .from("connections")
+      .update({ status: "cancelled" })
+      .eq("id", connectionId)
+      .eq("requester_id", userId)
+      .eq("status", "pending")
+      .select("id,status")
+      .maybeSingle();
+    if (updateErr) throw updateErr;
+
+    if (!updated) {
+      return reply(
+        {
+          error: "The request status changed before the cancellation could be processed.",
+          code: "STATUS_CHANGED",
+        },
+        409
+      );
+    }
+
+    return reply({ id: connectionId, status: "cancelled" }, 200);
+  } catch (error) {
+    if (error instanceof ConnectionRequestError) {
+      return reply({ error: error.message, code: error.code }, error.status);
+    }
+    return reply({ error: "Unable to cancel the request. Please try again later." }, 503);
   }
 }

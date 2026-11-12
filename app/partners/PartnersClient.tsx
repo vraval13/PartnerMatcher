@@ -78,7 +78,7 @@ export default function PartnersClient() {
   const [connectBusy, setConnectBusy] = useState(false);
   const [connectError, setConnectError] = useState("");
   const [connectFieldErrors, setConnectFieldErrors] = useState<MatchingFieldError[]>([]);
-  const [sentIds, setSentIds] = useState<Set<string>>(new Set());
+  const [sentConnections, setSentConnections] = useState<Record<string, { id: string; status: string }>>({});
   useEffect(() => {
     let live = true;
     api("/api/v1/matching-goals")
@@ -167,7 +167,7 @@ export default function PartnersClient() {
     setConnectError("");
     setConnectFieldErrors([]);
     try {
-      await api("/api/v1/connections", {
+      const result = await api("/api/v1/connections", {
         method: "POST",
         body: JSON.stringify({
           goal_id: selected,
@@ -178,7 +178,8 @@ export default function PartnersClient() {
           message: connectForm.message || undefined,
         }),
       });
-      setSentIds((prev) => new Set(prev).add(connectTarget!.candidate_goal_id));
+      const cgid = connectTarget!.candidate_goal_id;
+      setSentConnections((prev) => ({ ...prev, [cgid]: { id: result.id, status: "pending" } }));
       setConnectTarget(null);
     } catch (e) {
       if (e instanceof ApiError) setConnectFieldErrors(e.fieldErrors);
@@ -605,19 +606,63 @@ export default function PartnersClient() {
                     Times shown in your browser timezone. Scoring: {m.configuration_version}
                   </p>
                   <div className="mt-4">
-                    {sentIds.has(m.candidate_goal_id) ? (
-                      <span className="inline-block rounded-xl border border-green-500/40 bg-green-600/20 px-4 py-2 text-sm text-green-400">
-                        Request sent
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => openConnect(m)}
-                        disabled={busy || connectBusy}
-                        className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                      >
-                        Send request
-                      </button>
-                    )}
+                    {(() => {
+                      const sent = sentConnections[m.candidate_goal_id];
+                      if (!sent) {
+                        return (
+                          <button
+                            onClick={() => openConnect(m)}
+                            disabled={busy || connectBusy}
+                            className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                          >
+                            Send request
+                          </button>
+                        );
+                      }
+                      if (sent.status === "pending") {
+                        return (
+                          <div className="flex items-center gap-3">
+                            <span className="inline-block rounded-xl border border-green-500/40 bg-green-600/20 px-4 py-2 text-sm text-green-400">
+                              Request sent ✓
+                            </span>
+                            <button
+                              onClick={async () => {
+                                const res = await fetch(`/api/v1/connections/${sent.id}`, {
+                                  method: "PATCH",
+                                  headers: { "Content-Type": "application/json" },
+                                });
+                                if (res.ok) {
+                                  setSentConnections((prev) => ({
+                                    ...prev,
+                                    [m.candidate_goal_id]: { ...sent, status: "cancelled" },
+                                  }));
+                                }
+                              }}
+                              className="rounded-xl border px-3 py-2 text-xs font-semibold opacity-70 hover:opacity-100 transition"
+                              style={{ borderColor: "var(--border-card)", color: "var(--text-sub)" }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        );
+                      }
+                      if (sent.status === "cancelled") {
+                        return (
+                          <button
+                            onClick={() => openConnect(m)}
+                            disabled={busy || connectBusy}
+                            className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                          >
+                            Resend request
+                          </button>
+                        );
+                      }
+                      return (
+                        <span className="inline-block rounded-xl border border-green-500/40 bg-green-600/20 px-4 py-2 text-sm text-green-400">
+                          Request sent ✓
+                        </span>
+                      );
+                    })()}
                   </div>
                 </article>
               ))}
