@@ -761,7 +761,8 @@ export function DashboardClient({
                   No pending outgoing requests
                 </h3>
                 <p className="mt-1 max-w-xs text-xs leading-5" style={secondaryText}>
-                  Requests you've sent that haven't been accepted or declined yet will appear here.
+                  Requests you&apos;ve sent that haven&apos;t been accepted or declined yet will
+                  appear here.
                 </p>
               </div>
             ) : (
