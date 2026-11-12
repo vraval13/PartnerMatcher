@@ -11,7 +11,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createClient } from "@supabase/supabase-js";
-import { sendConnectionRequest, isEligibleCandidate, getReceivedRequests } from "../lib/connections/http";
+import {
+  sendConnectionRequest,
+  isEligibleCandidate,
+  getReceivedRequests,
+} from "../lib/connections/http";
 
 // ── fixed ids ────────────────────────────────────────────────────────────────
 
@@ -437,22 +441,21 @@ const receivedRow = {
 };
 
 /** Build a db stub for getReceivedRequests. */
-function receivedDb(overrides: {
-  connections?: unknown;
-  goals?: unknown;
-  error?: boolean;
-} = {}) {
+function receivedDb(
+  overrides: {
+    connections?: unknown;
+    goals?: unknown;
+    error?: boolean;
+  } = {}
+) {
   return db((url) => {
     // connections GET (receiver_id filter)
-    if (
-      url.pathname === "/rest/v1/connections" &&
-      url.searchParams.has("receiver_id")
-    ) {
+    if (url.pathname === "/rest/v1/connections" && url.searchParams.has("receiver_id")) {
       if (overrides.error) {
-        return new Response(
-          JSON.stringify({ code: "PGRST301", message: "db error" }),
-          { status: 500, headers: { "Content-Type": "application/json" } }
-        );
+        return new Response(JSON.stringify({ code: "PGRST301", message: "db error" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        });
       }
       return overrides.connections !== undefined ? overrides.connections : [receivedRow];
     }
@@ -520,14 +523,22 @@ test("US-11 AC2: returns empty array when no requests addressed to user", async 
 });
 
 test("US-11 AC3: accepted request appears with status=accepted (not suppressed)", async () => {
-  const accepted = { ...receivedRow, id: "aa111111-1111-4111-8111-111111111111", status: "accepted" };
+  const accepted = {
+    ...receivedRow,
+    id: "aa111111-1111-4111-8111-111111111111",
+    status: "accepted",
+  };
   const res = await getReceivedRequests(receivedDb({ connections: [accepted] }));
   const { requests } = await res.json();
   assert.equal(requests[0].status, "accepted");
 });
 
 test("US-11 AC3: rejected request appears with status=rejected", async () => {
-  const rejected = { ...receivedRow, id: "bb222222-2222-4222-8222-222222222222", status: "rejected" };
+  const rejected = {
+    ...receivedRow,
+    id: "bb222222-2222-4222-8222-222222222222",
+    status: "rejected",
+  };
   const res = await getReceivedRequests(receivedDb({ connections: [rejected] }));
   const { requests } = await res.json();
   assert.equal(requests[0].status, "rejected");

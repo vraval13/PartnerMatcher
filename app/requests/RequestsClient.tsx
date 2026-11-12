@@ -120,10 +120,7 @@ function RequestCard({ req }: { req: ReceivedRequest }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3
-              className="text-sm font-bold"
-              style={{ color: "var(--text-heading)" }}
-            >
+            <h3 className="text-sm font-bold" style={{ color: "var(--text-heading)" }}>
               {req.session_topic || "Study session"}
             </h3>
             <StatusBadge status={req.status} />
@@ -138,10 +135,7 @@ function RequestCard({ req }: { req: ReceivedRequest }) {
 
         {/* Proposed time (top-right on wide screens) */}
         {timeWindow && (
-          <p
-            className="shrink-0 text-right text-xs"
-            style={{ color: "var(--text-muted)" }}
-          >
+          <p className="shrink-0 text-right text-xs" style={{ color: "var(--text-muted)" }}>
             {timeWindow}
           </p>
         )}
@@ -361,10 +355,7 @@ export default function RequestsClient() {
                   borderColor: "var(--border-card)",
                 }}
               >
-                <div
-                  className="h-4 w-48 rounded"
-                  style={{ backgroundColor: "var(--bg-row)" }}
-                />
+                <div className="h-4 w-48 rounded" style={{ backgroundColor: "var(--bg-row)" }} />
                 <div
                   className="mt-3 h-3 w-72 rounded"
                   style={{ backgroundColor: "var(--bg-row)" }}
