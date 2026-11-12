@@ -422,7 +422,11 @@ function SentCard({
 type View = "received" | "sent";
 
 export default function RequestsClient() {
-  const [view, setView] = useState<View>("received");
+  const [view, setView] = useState<View>(() => {
+    // Open Sent tab directly when arriving via /requests#sent
+    if (typeof window !== "undefined" && window.location.hash === "#sent") return "sent";
+    return "received";
+  });
 
   // received
   const [requests, setRequests] = useState<ReceivedRequest[] | null>(null);
@@ -564,7 +568,12 @@ export default function RequestsClient() {
             return (
               <button
                 key={v}
-                onClick={() => { setView(v); setCancelError(""); setConfirmingId(null); }}
+                onClick={() => {
+                  setView(v);
+                  if (typeof window !== "undefined") window.location.hash = v;
+                  setCancelError("");
+                  setConfirmingId(null);
+                }}
                 className="flex items-center gap-2 rounded-xl px-5 py-2 text-sm font-semibold transition"
                 style={{
                   backgroundColor: isActive ? "var(--text-heading)" : "transparent",

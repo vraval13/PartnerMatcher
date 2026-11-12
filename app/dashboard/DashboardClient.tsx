@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
@@ -22,6 +23,15 @@ type ConnectionRow = {
   proposed_start: string | null;
   proposed_end: string | null;
   message: string | null;
+  created_at: string;
+};
+
+type SentConnectionRow = {
+  id: string;
+  receiver_id: string;
+  session_topic: string | null;
+  proposed_start: string | null;
+  proposed_end: string | null;
   created_at: string;
 };
 
@@ -121,6 +131,23 @@ function Icon({ name, size = 20 }: { name: string; size?: number }) {
         </svg>
       );
 
+    case "send":
+      return (
+        <svg {...common}>
+          <line x1="22" y1="2" x2="11" y2="13" />
+          <polygon points="22 2 15 22 11 13 2 9 22 2" />
+        </svg>
+      );
+
+    case "x-circle":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="10" />
+          <line x1="15" y1="9" x2="9" y2="15" />
+          <line x1="9" y1="9" x2="15" y2="15" />
+        </svg>
+      );
+
     default:
       return null;
   }
@@ -132,17 +159,44 @@ export function DashboardClient({
   courseCount,
   availabilityCount,
   pendingRequests,
+  pendingSentRequests,
 }: {
   user: User;
   profile: ProfileSummary | null;
   courseCount: number;
   availabilityCount: number;
   pendingRequests: ConnectionRow[];
+  pendingSentRequests: SentConnectionRow[];
 }) {
   const router = useRouter();
   const supabase = createClient();
 
   const { theme, toggle } = useTheme();
+
+  // US-12: cancel sent request from dashboard
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [cancelledIds, setCancelledIds] = useState<Set<string>>(new Set());
+  const [cancelBusy, setCancelBusy] = useState(false);
+
+  async function cancelSent(id: string) {
+    setCancelBusy(true);
+    try {
+      const res = await fetch(`/api/v1/connections/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (res.ok) {
+        setCancelledIds((prev) => new Set(prev).add(id));
+        setConfirmingId(null);
+      }
+    } catch {
+      // fail silently — full cancel management is at /requests#sent
+    } finally {
+      setCancelBusy(false);
+    }
+  }
+
+  const visibleSent = pendingSentRequests.filter((r) => !cancelledIds.has(r.id));
   const dark = theme === "dark";
 
   const displayName =
@@ -640,7 +694,7 @@ export function DashboardClient({
                           </span>
                         </div>
                         {timeWindow && (
-                          <p className="mt-1 text-xs" style={secondaryText}>
+                          <p suppressHydrationWarning className="mt-1 text-xs" style={secondaryText}>
                             {timeWindow}
                           </p>
                         )}
@@ -649,9 +703,142 @@ export function DashboardClient({
                             &ldquo;{req.message}&rdquo;
                           </p>
                         )}
-                        <p className="mt-1.5 text-xs" style={{ color: "var(--text-muted)" }}>
+                        <p suppressHydrationWarning className="mt-1.5 text-xs" style={{ color: "var(--text-muted)" }}>
                           Received {receivedOn}
                         </p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </section>
+
+        {/* Awaiting Response — pending sent requests (US-12) */}
+        <section className="mt-7">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <h2 className="text-base font-bold" style={{ color: "var(--text-heading)" }}>
+                Awaiting Response
+              </h2>
+              {visibleSent.length > 0 && (
+                <span
+                  className="inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-xs font-bold text-white"
+                  style={{ backgroundColor: "#d97706" }}
+                >
+                  {visibleSent.length}
+                </span>
+              )}
+            </div>
+            <Link
+              href="/requests#sent"
+              className="text-xs font-semibold underline-offset-4 hover:underline"
+              style={{ color: "var(--text-sub)" }}
+            >
+              View sent →
+            </Link>
+          </div>
+
+          <div className="rounded-2xl border" style={cardStyle}>
+            {visibleSent.length === 0 ? (
+              <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
+                <div
+                  className="flex h-14 w-14 items-center justify-center rounded-2xl"
+                  style={{ backgroundColor: "var(--bg-row)", color: "var(--text-heading)" }}
+                >
+                  <Icon name="send" size={22} />
+                </div>
+                <h3 className="mt-4 text-sm font-bold" style={{ color: "var(--text-heading)" }}>
+                  No pending outgoing requests
+                </h3>
+                <p className="mt-1 max-w-xs text-xs leading-5" style={secondaryText}>
+                  Requests you've sent that haven't been accepted or declined yet will appear here.
+                </p>
+              </div>
+            ) : (
+              <ul role="list">
+                {visibleSent.map((req) => {
+                  const startDate = req.proposed_start ? new Date(req.proposed_start) : null;
+                  const endDate = req.proposed_end ? new Date(req.proposed_end) : null;
+                  const timeWindow =
+                    startDate && endDate
+                      ? `${startDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · ${startDate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} – ${endDate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`
+                      : null;
+                  const sentOn = new Date(req.created_at).toLocaleDateString(undefined, {
+                    month: "short", day: "numeric", year: "numeric",
+                  });
+                  const isConfirming = confirmingId === req.id;
+                  return (
+                    <li
+                      key={req.id}
+                      className="flex items-start gap-4 border-b p-5 last:border-0"
+                      style={{ borderColor: "var(--border-row)" }}
+                    >
+                      <div
+                        className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                        style={{ backgroundColor: "var(--bg-row)", color: "var(--text-heading)" }}
+                      >
+                        <Icon name="send" size={17} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-bold" style={{ color: "var(--text-heading)" }}>
+                            {req.session_topic || "Study session"}
+                          </p>
+                          <span
+                            className="rounded-full border px-2 py-0.5 text-xs font-medium"
+                            style={{ borderColor: "rgba(217,119,6,0.4)", color: "#b45309", backgroundColor: "rgba(217,119,6,0.07)" }}
+                          >
+                            awaiting
+                          </span>
+                        </div>
+                        {timeWindow && (
+                          <p suppressHydrationWarning className="mt-1 text-xs" style={secondaryText}>
+                            {timeWindow}
+                          </p>
+                        )}
+                        <p suppressHydrationWarning className="mt-1.5 text-xs" style={{ color: "var(--text-muted)" }}>
+                          Sent {sentOn}
+                        </p>
+                      </div>
+
+                      {/* AC3: cancel only shown to sender (this is the sender's dashboard) */}
+                      <div className="shrink-0">
+                        {isConfirming ? (
+                          <div className="flex flex-col items-end gap-1.5">
+                            <span className="text-xs font-semibold" style={{ color: "#b91c1c" }}>
+                              Withdraw?
+                            </span>
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => cancelSent(req.id)}
+                                disabled={cancelBusy}
+                                className="rounded-lg px-2.5 py-1 text-xs font-semibold transition"
+                                style={{ backgroundColor: "#dc2626", color: "#fff", opacity: cancelBusy ? 0.6 : 1 }}
+                              >
+                                {cancelBusy ? "…" : "Yes"}
+                              </button>
+                              <button
+                                onClick={() => setConfirmingId(null)}
+                                disabled={cancelBusy}
+                                className="rounded-lg border px-2.5 py-1 text-xs font-semibold transition"
+                                style={{ borderColor: "var(--border-card)", color: "var(--text-sub)" }}
+                              >
+                                No
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmingId(req.id)}
+                            disabled={cancelBusy}
+                            className="rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:border-red-400 hover:text-red-500"
+                            style={{ borderColor: "var(--border-card)", color: "var(--text-muted)" }}
+                          >
+                            Cancel
+                          </button>
+                        )}
                       </div>
                     </li>
                   );
@@ -696,7 +883,7 @@ export function DashboardClient({
               {
                 icon: "inbox",
                 title: "Requests",
-                description: "View incoming study session proposals",
+                description: "View received and sent session proposals",
                 href: "/requests",
               },
             ].map((action) => (
@@ -720,12 +907,13 @@ export function DashboardClient({
                   <h3 className="text-sm font-bold" style={{ color: "var(--text-heading)" }}>
                     {action.title}
                   </h3>
-                  {action.title === "Requests" && pendingRequests.length > 0 && (
+                  {action.title === "Requests" &&
+                    (pendingRequests.length + visibleSent.length) > 0 && (
                     <span
                       className="inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
                       style={{ backgroundColor: "#6366f1" }}
                     >
-                      {pendingRequests.length}
+                      {pendingRequests.length + visibleSent.length}
                     </span>
                   )}
                 </div>
