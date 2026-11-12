@@ -63,24 +63,18 @@ function reply(value: unknown, status = 200): Response {
 
 function requireUUID(value: unknown, field: string): string {
   if (typeof value !== "string" || !UUID.test(value)) {
-    throw new ConnectionRequestError(
-      `A valid ${field} is required.`,
-      "INVALID_INPUT",
-      422,
-      [{ field, message: `A valid ${field} is required.` }]
-    );
+    throw new ConnectionRequestError(`A valid ${field} is required.`, "INVALID_INPUT", 422, [
+      { field, message: `A valid ${field} is required.` },
+    ]);
   }
   return value;
 }
 
 function requireString(value: unknown, field: string, max: number): string {
   if (typeof value !== "string" || !value.trim()) {
-    throw new ConnectionRequestError(
-      `${field} is required.`,
-      "MISSING_FIELD",
-      422,
-      [{ field, message: `${field} is required.` }]
-    );
+    throw new ConnectionRequestError(`${field} is required.`, "MISSING_FIELD", 422, [
+      { field, message: `${field} is required.` },
+    ]);
   }
   if (value.trim().length > max) {
     throw new ConnectionRequestError(
@@ -95,12 +89,9 @@ function requireString(value: unknown, field: string, max: number): string {
 
 function requireISODatetime(value: unknown, field: string): string {
   if (typeof value !== "string" || !value.trim()) {
-    throw new ConnectionRequestError(
-      `${field} is required.`,
-      "MISSING_FIELD",
-      422,
-      [{ field, message: `${field} is required.` }]
-    );
+    throw new ConnectionRequestError(`${field} is required.`, "MISSING_FIELD", 422, [
+      { field, message: `${field} is required.` },
+    ]);
   }
   const d = new Date(value);
   if (isNaN(d.getTime())) {
@@ -181,9 +172,7 @@ export async function sendConnectionRequest(
     }
 
     const message =
-      typeof v.message === "string" && v.message.trim()
-        ? v.message.slice(0, 500).trim()
-        : null;
+      typeof v.message === "string" && v.message.trim() ? v.message.slice(0, 500).trim() : null;
 
     // Load requester's own goal — 404 if not found, foreign, or archived
     const { data: ownGoal, error: ownErr } = await db
@@ -273,9 +262,6 @@ export async function sendConnectionRequest(
       );
     }
     // Never expose DB internals
-    return reply(
-      { error: "Connection storage is unavailable. Please try again later." },
-      503
-    );
+    return reply({ error: "Connection storage is unavailable. Please try again later." }, 503);
   }
 }

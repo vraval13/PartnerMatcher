@@ -672,9 +672,7 @@ export default function PartnersClient() {
                   maxLength={200}
                   placeholder="e.g. React Hooks deep dive"
                   value={connectForm.session_topic}
-                  onChange={(e) =>
-                    setConnectForm((f) => ({ ...f, session_topic: e.target.value }))
-                  }
+                  onChange={(e) => setConnectForm((f) => ({ ...f, session_topic: e.target.value }))}
                   aria-invalid={connectFieldErrors.some((x) => x.field === "session_topic")}
                 />
                 {connectFieldErrors.find((x) => x.field === "session_topic") && (
@@ -722,8 +720,7 @@ export default function PartnersClient() {
                 </label>
               </div>
               <label className="block text-sm">
-                Message{" "}
-                <span className="opacity-50">(optional, max 500 chars)</span>
+                Message <span className="opacity-50">(optional, max 500 chars)</span>
                 <textarea
                   className={inputClass}
                   rows={3}

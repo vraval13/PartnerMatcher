@@ -16,10 +16,10 @@ import { sendConnectionRequest, isEligibleCandidate } from "../lib/connections/h
 // ── fixed ids ────────────────────────────────────────────────────────────────
 
 const requesterId = "11111111-1111-4111-8111-111111111111";
-const receiverId  = "22222222-2222-4222-8222-222222222222";
-const goalId      = "33333333-3333-4333-8333-333333333333";
-const candGoalId  = "44444444-4444-4444-8444-444444444444";
-const connId      = "55555555-5555-4555-8555-555555555555";
+const receiverId = "22222222-2222-4222-8222-222222222222";
+const goalId = "33333333-3333-4333-8333-333333333333";
+const candGoalId = "44444444-4444-4444-8444-444444444444";
+const connId = "55555555-5555-4555-8555-555555555555";
 
 // ── goal fixtures ─────────────────────────────────────────────────────────────
 
@@ -92,9 +92,7 @@ function db(lookup: (url: URL, init?: RequestInit) => unknown, signedIn = true) 
 }
 
 /** Happy-path DB: requester's goal → own, candidate's goal → candidate, INSERT → connId. */
-function happyDb(
-  overrides: { own?: unknown; candidate?: unknown; insertResult?: unknown } = {}
-) {
+function happyDb(overrides: { own?: unknown; candidate?: unknown; insertResult?: unknown } = {}) {
   return db((url, init) => {
     // INSERT into connections — match by path to avoid catching auth POSTs
     if (init?.method === "POST" && url.pathname === "/rest/v1/connections") {
@@ -158,22 +156,21 @@ test("US-08 AC2: isEligibleCandidate rejects different institution", () => {
 });
 
 test("US-08 AC2: isEligibleCandidate rejects different course", () => {
-  assert.equal(
-    isEligibleCandidate(ownGoal, { ...candidateGoal, course_key: "cs101" }),
-    false
-  );
+  assert.equal(isEligibleCandidate(ownGoal, { ...candidateGoal, course_key: "cs101" }), false);
 });
 
 test("US-08 AC2: isEligibleCandidate rejects different topic", () => {
-  assert.equal(
-    isEligibleCandidate(ownGoal, { ...candidateGoal, topic_key: "vue.js" }),
-    false
-  );
+  assert.equal(isEligibleCandidate(ownGoal, { ...candidateGoal, topic_key: "vue.js" }), false);
 });
 
 test("US-08 AC2: isEligibleCandidate uses assignment_id equality for assignment mode", () => {
   const assignOwn = { ...ownGoal, mode: "assignment", assignment_id: "HW-01", topic_key: "" };
-  const assignCand = { ...candidateGoal, mode: "assignment", assignment_id: "HW-01", topic_key: "" };
+  const assignCand = {
+    ...candidateGoal,
+    mode: "assignment",
+    assignment_id: "HW-01",
+    topic_key: "",
+  };
   assert.equal(isEligibleCandidate(assignOwn, assignCand), true);
   assert.equal(isEligibleCandidate(assignOwn, { ...assignCand, assignment_id: "HW-02" }), false);
 });
@@ -250,10 +247,7 @@ test("US-08 AC2: missing session_topic returns 422", async () => {
   const client = db(() => {
     throw new Error("Must not query DB");
   });
-  const res = await sendConnectionRequest(
-    client,
-    request({ ...validBody, session_topic: "" })
-  );
+  const res = await sendConnectionRequest(client, request({ ...validBody, session_topic: "" }));
   assert.equal(res.status, 422);
   const body = await res.json();
   assert.equal(body.field_errors[0].field, "session_topic");
@@ -263,10 +257,7 @@ test("US-08 AC2: missing proposed_start returns 422", async () => {
   const client = db(() => {
     throw new Error("Must not query DB");
   });
-  const res = await sendConnectionRequest(
-    client,
-    request({ ...validBody, proposed_start: "" })
-  );
+  const res = await sendConnectionRequest(client, request({ ...validBody, proposed_start: "" }));
   assert.equal(res.status, 422);
   const body = await res.json();
   assert.equal(body.field_errors[0].field, "proposed_start");
@@ -276,10 +267,7 @@ test("US-08 AC2: missing proposed_end returns 422", async () => {
   const client = db(() => {
     throw new Error("Must not query DB");
   });
-  const res = await sendConnectionRequest(
-    client,
-    request({ ...validBody, proposed_end: "" })
-  );
+  const res = await sendConnectionRequest(client, request({ ...validBody, proposed_end: "" }));
   assert.equal(res.status, 422);
   const body = await res.json();
   assert.equal(body.field_errors[0].field, "proposed_end");
@@ -335,10 +323,7 @@ test("US-08 AC2: candidate not listed returns 422 — not in current results", a
 });
 
 test("US-08 AC2: candidate not found (not listed/archived) returns 422 — not in results", async () => {
-  const res = await sendConnectionRequest(
-    happyDb({ candidate: null }),
-    request(validBody)
-  );
+  const res = await sendConnectionRequest(happyDb({ candidate: null }), request(validBody));
   assert.equal(res.status, 422);
   assert.equal((await res.json()).code, "CANDIDATE_NOT_IN_RESULTS");
 });
@@ -378,7 +363,12 @@ test("US-08: duplicate request returns 409 when connection already exists", asyn
       // PostgREST returns 409 with a JSON body containing the Postgres error code.
       // We return a non-2xx Response so postgrest-js parses it via processResponse.
       return new Response(
-        JSON.stringify({ code: "23505", message: "duplicate key value", details: null, hint: null }),
+        JSON.stringify({
+          code: "23505",
+          message: "duplicate key value",
+          details: null,
+          hint: null,
+        }),
         { status: 409, headers: { "Content-Type": "application/json" } }
       );
     }
@@ -399,10 +389,7 @@ test("US-08: invalid UUID for goal_id returns 422 without DB query", async () =>
   const client = db(() => {
     throw new Error("Must not query DB");
   });
-  const res = await sendConnectionRequest(
-    client,
-    request({ ...validBody, goal_id: "not-a-uuid" })
-  );
+  const res = await sendConnectionRequest(client, request({ ...validBody, goal_id: "not-a-uuid" }));
   assert.equal(res.status, 422);
   assert.equal((await res.json()).field_errors[0].field, "goal_id");
 });

@@ -572,9 +572,10 @@ export function DashboardClient({
                 {pendingRequests.map((req) => {
                   const startDate = req.proposed_start ? new Date(req.proposed_start) : null;
                   const endDate = req.proposed_end ? new Date(req.proposed_end) : null;
-                  const timeWindow = startDate && endDate
-                    ? `${startDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · ${startDate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} – ${endDate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`
-                    : null;
+                  const timeWindow =
+                    startDate && endDate
+                      ? `${startDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · ${startDate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} – ${endDate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`
+                      : null;
                   const receivedOn = new Date(req.created_at).toLocaleDateString(undefined, {
                     month: "short",
                     day: "numeric",
@@ -613,10 +614,7 @@ export function DashboardClient({
                           </p>
                         )}
                         {req.message && (
-                          <p
-                            className="mt-1 line-clamp-2 text-xs italic"
-                            style={secondaryText}
-                          >
+                          <p className="mt-1 line-clamp-2 text-xs italic" style={secondaryText}>
                             &ldquo;{req.message}&rdquo;
                           </p>
                         )}
