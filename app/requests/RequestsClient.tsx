@@ -507,6 +507,7 @@ export default function RequestsClient() {
   const [respondingId, setRespondingId] = useState<string | null>(null);
   const [respondBusy, setRespondBusy] = useState(false);
   const [respondError, setRespondError] = useState("");
+  const [respondSuccess, setRespondSuccess] = useState("");
 
   useEffect(() => {
     let live = true;
@@ -524,6 +525,13 @@ export default function RequestsClient() {
       live = false;
     };
   }, []);
+
+  // Auto-dismiss the respond success banner after 3s
+  useEffect(() => {
+    if (!respondSuccess) return;
+    const t = setTimeout(() => setRespondSuccess(""), 3000);
+    return () => clearTimeout(t);
+  }, [respondSuccess]);
 
   useEffect(() => {
     let live = true;
@@ -587,6 +595,7 @@ export default function RequestsClient() {
       setRequests((prev) =>
         (prev ?? []).map((r) => (r.id === id ? { ...r, status: newStatus } : r))
       );
+      setRespondSuccess(action === "accept" ? "Request accepted." : "Request declined.");
     } catch {
       setRespondError("Unable to respond. Please try again.");
     } finally {
@@ -678,6 +687,7 @@ export default function RequestsClient() {
                   if (typeof window !== "undefined") window.location.hash = v;
                   setCancelError("");
                   setRespondError("");
+                  setRespondSuccess("");
                   setConfirmingId(null);
                 }}
                 className="flex items-center gap-2 rounded-xl px-5 py-2 text-sm font-semibold transition"
@@ -725,6 +735,33 @@ export default function RequestsClient() {
               >
                 {respondError}
               </p>
+            )}
+
+            {respondSuccess && (
+              <div
+                role="status"
+                className="mb-6 flex items-center gap-3 rounded-xl border p-4 text-sm font-medium transition-opacity"
+                style={{
+                  borderColor: "rgba(22,163,74,0.4)",
+                  backgroundColor: "rgba(22,163,74,0.08)",
+                  color: "#15803d",
+                }}
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="shrink-0"
+                >
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+                {respondSuccess}
+              </div>
             )}
 
             {requests !== null && requests.length > 0 && (

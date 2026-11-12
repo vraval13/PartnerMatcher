@@ -35,6 +35,16 @@ type SentConnectionRow = {
   created_at: string;
 };
 
+export type AcceptedConnectionRow = {
+  id: string;
+  partner_id: string;
+  partner_display_name: string | null;
+  session_topic: string | null;
+  proposed_start: string | null;
+  proposed_end: string | null;
+  created_at: string;
+};
+
 const yearLabels = ["1st year", "2nd year", "3rd year", "4th year", "5th year", "Graduate", "PhD"];
 
 const readable = (value: string | null | undefined) =>
@@ -160,6 +170,8 @@ export function DashboardClient({
   availabilityCount,
   pendingRequests,
   pendingSentRequests,
+  acceptedConnectionsCount,
+  recentConnections,
 }: {
   user: User;
   profile: ProfileSummary | null;
@@ -167,6 +179,8 @@ export function DashboardClient({
   availabilityCount: number;
   pendingRequests: ConnectionRow[];
   pendingSentRequests: SentConnectionRow[];
+  acceptedConnectionsCount: number;
+  recentConnections: AcceptedConnectionRow[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -423,7 +437,7 @@ export function DashboardClient({
           <div className="rounded-2xl border p-5 sm:p-6" style={cardStyle}>
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium" style={secondaryText}>
-                University
+                Connections
               </span>
 
               <div
@@ -433,17 +447,24 @@ export function DashboardClient({
                   color: "var(--text-heading)",
                 }}
               >
-                <Icon name="school" />
+                <Icon name="check" />
               </div>
             </div>
 
-            <p className="mt-5 truncate text-lg font-bold" style={{ color: "var(--text-heading)" }}>
-              {profile?.university || "Not set"}
+            <p
+              className="mt-5 text-3xl font-bold tracking-tight"
+              style={{ color: "var(--text-heading)" }}
+            >
+              {acceptedConnectionsCount}
             </p>
 
-            <p className="mt-2 text-xs" style={secondaryText}>
-              Your academic community
-            </p>
+            <Link
+              href="/requests"
+              className="mt-2 inline-block text-xs font-semibold underline-offset-4 hover:underline"
+              style={{ color: "var(--text-sub)" }}
+            >
+              {acceptedConnectionsCount > 0 ? "View connections →" : "No active connections"}
+            </Link>
           </div>
 
           <div className="rounded-2xl border p-5 sm:p-6" style={cardStyle}>
@@ -928,6 +949,121 @@ export function DashboardClient({
                             Cancel
                           </button>
                         )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </section>
+
+        {/* Active Connections — recently accepted (US-13 relating) */}
+        <section className="mt-7">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <h2 className="text-base font-bold" style={{ color: "var(--text-heading)" }}>
+                Active Connections
+              </h2>
+              {acceptedConnectionsCount > 0 && (
+                <span
+                  className="inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-xs font-bold text-white"
+                  style={{ backgroundColor: "#16a34a" }}
+                >
+                  {acceptedConnectionsCount}
+                </span>
+              )}
+            </div>
+            <Link
+              href="/requests"
+              className="text-xs font-semibold underline-offset-4 hover:underline"
+              style={{ color: "var(--text-sub)" }}
+            >
+              View all →
+            </Link>
+          </div>
+
+          <div className="rounded-2xl border" style={cardStyle}>
+            {recentConnections.length === 0 ? (
+              <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
+                <div
+                  className="flex h-14 w-14 items-center justify-center rounded-2xl"
+                  style={{ backgroundColor: "var(--bg-row)", color: "var(--text-heading)" }}
+                >
+                  <Icon name="users" size={24} />
+                </div>
+                <h3 className="mt-4 text-sm font-bold" style={{ color: "var(--text-heading)" }}>
+                  No active connections yet
+                </h3>
+                <p className="mt-1 max-w-xs text-xs leading-5" style={secondaryText}>
+                  When you accept a connection request or a partner accepts yours, it will appear
+                  here.
+                </p>
+              </div>
+            ) : (
+              <ul role="list">
+                {recentConnections.map((conn) => {
+                  const startDate = conn.proposed_start ? new Date(conn.proposed_start) : null;
+                  const endDate = conn.proposed_end ? new Date(conn.proposed_end) : null;
+                  const timeWindow =
+                    startDate && endDate
+                      ? `${startDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · ${startDate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} – ${endDate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`
+                      : null;
+                  const connectedOn = new Date(conn.created_at).toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  });
+                  return (
+                    <li
+                      key={conn.id}
+                      className="flex items-start gap-4 border-b p-5 last:border-0"
+                      style={{ borderColor: "var(--border-row)" }}
+                    >
+                      <div
+                        className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                        style={{ backgroundColor: "rgba(22,163,74,0.12)", color: "#16a34a" }}
+                      >
+                        <Icon name="check" size={17} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-bold" style={{ color: "var(--text-heading)" }}>
+                            {conn.session_topic || "Study session"}
+                          </p>
+                          <span
+                            className="rounded-full border px-2 py-0.5 text-xs font-medium"
+                            style={{
+                              borderColor: "rgba(22,163,74,0.4)",
+                              color: "#15803d",
+                              backgroundColor: "rgba(22,163,74,0.07)",
+                            }}
+                          >
+                            accepted
+                          </span>
+                        </div>
+                        <p className="mt-0.5 text-xs font-medium" style={secondaryText}>
+                          With{" "}
+                          <span style={{ color: "var(--text-heading)" }}>
+                            {conn.partner_display_name ?? "A student"}
+                          </span>
+                        </p>
+                        {timeWindow && (
+                          <p
+                            suppressHydrationWarning
+                            className="mt-1 text-xs"
+                            style={secondaryText}
+                          >
+                            {timeWindow}
+                          </p>
+                        )}
+                        <p
+                          suppressHydrationWarning
+                          className="mt-1.5 text-xs"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          Connected {connectedOn}
+                        </p>
                       </div>
                     </li>
                   );
