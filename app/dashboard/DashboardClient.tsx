@@ -15,6 +15,16 @@ type ProfileSummary = {
   timezone: string | null;
 };
 
+type ConnectionRow = {
+  id: string;
+  requester_id: string;
+  session_topic: string | null;
+  proposed_start: string | null;
+  proposed_end: string | null;
+  message: string | null;
+  created_at: string;
+};
+
 const yearLabels = ["1st year", "2nd year", "3rd year", "4th year", "5th year", "Graduate", "PhD"];
 
 const readable = (value: string | null | undefined) =>
@@ -96,6 +106,21 @@ function Icon({ name, size = 20 }: { name: string; size?: number }) {
         </svg>
       );
 
+    case "inbox":
+      return (
+        <svg {...common}>
+          <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+          <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+        </svg>
+      );
+
+    case "check":
+      return (
+        <svg {...common}>
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      );
+
     default:
       return null;
   }
@@ -106,11 +131,13 @@ export function DashboardClient({
   profile,
   courseCount,
   availabilityCount,
+  pendingRequests,
 }: {
   user: User;
   profile: ProfileSummary | null;
   courseCount: number;
   availabilityCount: number;
+  pendingRequests: ConnectionRow[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -500,6 +527,108 @@ export function DashboardClient({
                 Find partners
               </Link>
             </div>
+          </div>
+        </section>
+
+        {/* Connection Requests */}
+        <section className="mt-7">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <h2 className="text-base font-bold" style={{ color: "var(--text-heading)" }}>
+                Connection Requests
+              </h2>
+              {pendingRequests.length > 0 && (
+                <span
+                  className="inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-xs font-bold text-white"
+                  style={{ backgroundColor: "var(--text-heading)" }}
+                >
+                  {pendingRequests.length}
+                </span>
+              )}
+            </div>
+            <p className="text-xs" style={secondaryText}>
+              Incoming study session proposals
+            </p>
+          </div>
+
+          <div className="rounded-2xl border" style={cardStyle}>
+            {pendingRequests.length === 0 ? (
+              <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
+                <div
+                  className="flex h-14 w-14 items-center justify-center rounded-2xl"
+                  style={{ backgroundColor: "var(--bg-row)", color: "var(--text-heading)" }}
+                >
+                  <Icon name="inbox" size={24} />
+                </div>
+                <h3 className="mt-4 text-sm font-bold" style={{ color: "var(--text-heading)" }}>
+                  No pending requests
+                </h3>
+                <p className="mt-1 max-w-xs text-xs leading-5" style={secondaryText}>
+                  When another student sends you a connection request it will appear here.
+                </p>
+              </div>
+            ) : (
+              <ul role="list">
+                {pendingRequests.map((req) => {
+                  const startDate = req.proposed_start ? new Date(req.proposed_start) : null;
+                  const endDate = req.proposed_end ? new Date(req.proposed_end) : null;
+                  const timeWindow = startDate && endDate
+                    ? `${startDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · ${startDate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} – ${endDate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`
+                    : null;
+                  const receivedOn = new Date(req.created_at).toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  });
+                  return (
+                    <li
+                      key={req.id}
+                      className="flex items-start gap-4 border-b p-5 last:border-0"
+                      style={{ borderColor: "var(--border-row)" }}
+                    >
+                      <div
+                        className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                        style={{ backgroundColor: "var(--bg-row)", color: "var(--text-heading)" }}
+                      >
+                        <Icon name="message" size={18} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-bold" style={{ color: "var(--text-heading)" }}>
+                            {req.session_topic || "Study session"}
+                          </p>
+                          <span
+                            className="rounded-full border px-2 py-0.5 text-xs font-medium"
+                            style={{
+                              borderColor: "var(--border-card)",
+                              color: "var(--text-muted)",
+                            }}
+                          >
+                            pending
+                          </span>
+                        </div>
+                        {timeWindow && (
+                          <p className="mt-1 text-xs" style={secondaryText}>
+                            {timeWindow}
+                          </p>
+                        )}
+                        {req.message && (
+                          <p
+                            className="mt-1 line-clamp-2 text-xs italic"
+                            style={secondaryText}
+                          >
+                            &ldquo;{req.message}&rdquo;
+                          </p>
+                        )}
+                        <p className="mt-1.5 text-xs" style={{ color: "var(--text-muted)" }}>
+                          Received {receivedOn}
+                        </p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
         </section>
 
