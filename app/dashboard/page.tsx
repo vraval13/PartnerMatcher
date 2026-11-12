@@ -33,6 +33,14 @@ export default async function DashboardPage() {
     .order("created_at", { ascending: false })
     .limit(10);
 
+  const { data: pendingSentRequests } = await supabase
+    .from("connections")
+    .select("id, receiver_id, session_topic, proposed_start, proposed_end, created_at")
+    .eq("requester_id", user.id)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(5);
+
   const { data: matchingGoals } = await supabase
     .from("matching_goals")
     .select("id, matching_availability(id)")
@@ -51,6 +59,7 @@ export default async function DashboardPage() {
       courseCount={courseCount ?? 0}
       availabilityCount={availabilityCount}
       pendingRequests={pendingRequests ?? []}
+      pendingSentRequests={pendingSentRequests ?? []}
     />
   );
 }
