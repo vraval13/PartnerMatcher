@@ -1,9 +1,10 @@
 /**
  * US-08 — Send a session connection request.
+ * US-11 — View received connection requests.
  *
  * Pure functions that accept an injected SupabaseClient so they can be
  * unit-tested without a Next.js environment. The route handler in
- * app/api/v1/connections/route.ts is a thin wrapper around sendConnectionRequest.
+ * app/api/v1/connections/route.ts wraps both.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -27,6 +28,20 @@ type GoalRow = {
   assignment_id: string | null;
   is_listed: boolean;
   archived_at: string | null;
+};
+
+export type ConnectionStatus = "pending" | "accepted" | "rejected" | "blocked";
+
+export type ReceivedRequest = {
+  id: string;
+  requester_id: string;
+  requester_display_name: string | null;
+  session_topic: string | null;
+  proposed_start: string | null;
+  proposed_end: string | null;
+  message: string | null;
+  status: ConnectionStatus;
+  created_at: string;
 };
 
 export type ConnectionRequestBody = {
@@ -263,5 +278,65 @@ export async function sendConnectionRequest(
     }
     // Never expose DB internals
     return reply({ error: "Connection storage is unavailable. Please try again later." }, 503);
+  }
+}
+
+// ── US-11: get received requests ─────────────────────────────────────────────
+
+/**
+ * Returns all connection requests addressed to the authenticated user,
+ * newest first, enriched with the requester's display name where available.
+ * AC2: the query filters by receiver_id = userId — other students' requests
+ *      are never returned regardless of RLS.
+ */
+export async function getReceivedRequests(db: SupabaseClient): Promise<Response> {
+  try {
+    const userId = await getAuthUserId(db);
+    if (!userId) {
+      return reply({ error: "Sign in to view connection requests." }, 401);
+    }
+
+    // AC2: only requests addressed to this user
+    const { data: rows, error: connErr } = await db
+      .from("connections")
+      .select("id,requester_id,session_topic,proposed_start,proposed_end,message,status,created_at")
+      .eq("receiver_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (connErr) throw connErr;
+
+    // Batch-fetch a display name for each unique requester (best-effort: first
+    // non-archived goal per user). Missing display names return null — the UI
+    // falls back to "A student".
+    const requesterIds = [...new Set((rows ?? []).map((r) => r.requester_id))];
+    const displayNames: Record<string, string> = {};
+    if (requesterIds.length > 0) {
+      const { data: goals } = await db
+        .from("matching_goals")
+        .select("user_id,display_name")
+        .in("user_id", requesterIds)
+        .is("archived_at", null);
+      (goals ?? []).forEach((g) => {
+        if (g.user_id && !displayNames[g.user_id]) {
+          displayNames[g.user_id] = g.display_name;
+        }
+      });
+    }
+
+    const requests: ReceivedRequest[] = (rows ?? []).map((r) => ({
+      id: r.id,
+      requester_id: r.requester_id,
+      requester_display_name: displayNames[r.requester_id] ?? null,
+      session_topic: r.session_topic,
+      proposed_start: r.proposed_start,
+      proposed_end: r.proposed_end,
+      message: r.message,
+      status: r.status as ConnectionStatus,
+      created_at: r.created_at,
+    }));
+
+    return reply({ requests }, 200);
+  } catch {
+    return reply({ error: "Unable to load connection requests. Please try again later." }, 503);
   }
 }
