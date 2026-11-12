@@ -11,7 +11,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createClient } from "@supabase/supabase-js";
-import { sendConnectionRequest, isEligibleCandidate } from "../lib/connections/http";
+import { sendConnectionRequest, isEligibleCandidate, getReceivedRequests } from "../lib/connections/http";
 
 // ── fixed ids ────────────────────────────────────────────────────────────────
 
@@ -420,4 +420,145 @@ test("US-08: malformed JSON body returns 422", async () => {
   );
   assert.equal(res.status, 422);
   assert.equal((await res.json()).code, "INVALID_JSON");
+});
+
+// ── US-11: getReceivedRequests ────────────────────────────────────────────────
+
+/** Received-request fixture */
+const receivedRow = {
+  id: connId,
+  requester_id: requesterId,
+  session_topic: "React Hooks deep dive",
+  proposed_start: "2026-11-15T14:00:00.000Z",
+  proposed_end: "2026-11-15T16:00:00.000Z",
+  message: "Hey, want to study together?",
+  status: "pending",
+  created_at: "2026-11-11T10:00:00.000Z",
+};
+
+/** Build a db stub for getReceivedRequests. */
+function receivedDb(overrides: {
+  connections?: unknown;
+  goals?: unknown;
+  error?: boolean;
+} = {}) {
+  return db((url) => {
+    // connections GET (receiver_id filter)
+    if (
+      url.pathname === "/rest/v1/connections" &&
+      url.searchParams.has("receiver_id")
+    ) {
+      if (overrides.error) {
+        return new Response(
+          JSON.stringify({ code: "PGRST301", message: "db error" }),
+          { status: 500, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      return overrides.connections !== undefined ? overrides.connections : [receivedRow];
+    }
+    // matching_goals display-name lookup (user_id=in.)
+    if (
+      url.pathname === "/rest/v1/matching_goals" &&
+      url.searchParams.get("user_id")?.startsWith("in.")
+    ) {
+      return overrides.goals !== undefined
+        ? overrides.goals
+        : [{ user_id: requesterId, display_name: "Alex Chen" }];
+    }
+    return null;
+  });
+}
+
+test("US-11: unauthenticated request returns 401", async () => {
+  const client = db(() => null, false);
+  const res = await getReceivedRequests(client);
+  assert.equal(res.status, 401);
+});
+
+test("US-11 AC1: returns 200 with requests array", async () => {
+  const res = await getReceivedRequests(receivedDb());
+  assert.equal(res.status, 200);
+  const { requests } = await res.json();
+  assert.ok(Array.isArray(requests));
+  assert.equal(requests.length, 1);
+});
+
+test("US-11 AC1: request includes session_topic, proposed_start, proposed_end, status, created_at", async () => {
+  const res = await getReceivedRequests(receivedDb());
+  const { requests } = await res.json();
+  const r = requests[0];
+  assert.equal(r.session_topic, receivedRow.session_topic);
+  assert.equal(r.proposed_start, receivedRow.proposed_start);
+  assert.equal(r.proposed_end, receivedRow.proposed_end);
+  assert.equal(r.status, "pending");
+  assert.equal(r.created_at, receivedRow.created_at);
+});
+
+test("US-11 AC1: request includes requester display name from matching_goals", async () => {
+  const res = await getReceivedRequests(receivedDb());
+  const { requests } = await res.json();
+  assert.equal(requests[0].requester_display_name, "Alex Chen");
+});
+
+test("US-11 AC1: requester_display_name is null when no matching goal found", async () => {
+  const res = await getReceivedRequests(receivedDb({ goals: [] }));
+  const { requests } = await res.json();
+  assert.equal(requests[0].requester_display_name, null);
+});
+
+test("US-11 AC1: request includes message", async () => {
+  const res = await getReceivedRequests(receivedDb());
+  const { requests } = await res.json();
+  assert.equal(requests[0].message, receivedRow.message);
+});
+
+test("US-11 AC2: returns empty array when no requests addressed to user", async () => {
+  const res = await getReceivedRequests(receivedDb({ connections: [], goals: [] }));
+  assert.equal(res.status, 200);
+  const { requests } = await res.json();
+  assert.equal(requests.length, 0);
+});
+
+test("US-11 AC3: accepted request appears with status=accepted (not suppressed)", async () => {
+  const accepted = { ...receivedRow, id: "aa111111-1111-4111-8111-111111111111", status: "accepted" };
+  const res = await getReceivedRequests(receivedDb({ connections: [accepted] }));
+  const { requests } = await res.json();
+  assert.equal(requests[0].status, "accepted");
+});
+
+test("US-11 AC3: rejected request appears with status=rejected", async () => {
+  const rejected = { ...receivedRow, id: "bb222222-2222-4222-8222-222222222222", status: "rejected" };
+  const res = await getReceivedRequests(receivedDb({ connections: [rejected] }));
+  const { requests } = await res.json();
+  assert.equal(requests[0].status, "rejected");
+});
+
+test("US-11 AC3: blocked request appears with status=blocked", async () => {
+  const blocked = { ...receivedRow, id: "cc333333-3333-4333-8333-333333333333", status: "blocked" };
+  const res = await getReceivedRequests(receivedDb({ connections: [blocked] }));
+  const { requests } = await res.json();
+  assert.equal(requests[0].status, "blocked");
+});
+
+test("US-11 AC3: multiple statuses all returned together", async () => {
+  const rows = [
+    { ...receivedRow, id: "dd111111-1111-4111-8111-111111111111", status: "pending" },
+    { ...receivedRow, id: "dd222222-2222-4222-8222-222222222222", status: "accepted" },
+    { ...receivedRow, id: "dd333333-3333-4333-8333-333333333333", status: "rejected" },
+  ];
+  const res = await getReceivedRequests(receivedDb({ connections: rows }));
+  const { requests } = await res.json();
+  assert.equal(requests.length, 3);
+  const statuses = requests.map((r: { status: string }) => r.status).sort();
+  assert.deepEqual(statuses, ["accepted", "pending", "rejected"]);
+});
+
+test("US-11: DB error returns 503", async () => {
+  const res = await getReceivedRequests(receivedDb({ error: true }));
+  assert.equal(res.status, 503);
+});
+
+test("US-11: response Cache-Control is private, no-store", async () => {
+  const res = await getReceivedRequests(receivedDb());
+  assert.equal(res.headers.get("cache-control"), "private, no-store");
 });

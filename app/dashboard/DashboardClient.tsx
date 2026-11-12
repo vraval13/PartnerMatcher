@@ -546,9 +546,13 @@ export function DashboardClient({
                 </span>
               )}
             </div>
-            <p className="text-xs" style={secondaryText}>
-              Incoming study session proposals
-            </p>
+            <Link
+              href="/requests"
+              className="text-xs font-semibold underline-offset-4 hover:underline"
+              style={{ color: "var(--text-sub)" }}
+            >
+              View all →
+            </Link>
           </div>
 
           <div className="rounded-2xl border" style={cardStyle}>
