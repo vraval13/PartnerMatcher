@@ -217,6 +217,33 @@ export function DashboardClient({
               <Icon name={dark ? "sun" : "moon"} size={19} />
             </button>
 
+            {/* Inbox / connection requests shortcut */}
+            <Link
+              href="/requests"
+              aria-label={
+                pendingRequests.length > 0
+                  ? `${pendingRequests.length} pending connection request${pendingRequests.length !== 1 ? "s" : ""}`
+                  : "Connection requests"
+              }
+              title="Connection requests"
+              className="relative flex h-10 w-10 items-center justify-center rounded-xl border transition hover:opacity-70"
+              style={{
+                backgroundColor: "var(--bg-card)",
+                borderColor: "var(--border-card)",
+                color: "var(--text-heading)",
+              }}
+            >
+              <Icon name="inbox" size={19} />
+              {pendingRequests.length > 0 && (
+                <span
+                  className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
+                  style={{ backgroundColor: "#6366f1" }}
+                >
+                  {pendingRequests.length > 9 ? "9+" : pendingRequests.length}
+                </span>
+              )}
+            </Link>
+
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-800 dark:bg-slate-700 dark:text-white">
               {initials}
             </div>
@@ -667,10 +694,10 @@ export function DashboardClient({
                 href: "/availability",
               },
               {
-                icon: "message",
-                title: "Messages",
-                description: "Connect with your study partners",
-                href: "/dashboard",
+                icon: "inbox",
+                title: "Requests",
+                description: "View incoming study session proposals",
+                href: "/requests",
               },
             ].map((action) => (
               <Link
@@ -689,9 +716,19 @@ export function DashboardClient({
                   <Icon name={action.icon} />
                 </div>
 
-                <h3 className="mt-4 text-sm font-bold" style={{ color: "var(--text-heading)" }}>
-                  {action.title}
-                </h3>
+                <div className="mt-4 flex items-center gap-2">
+                  <h3 className="text-sm font-bold" style={{ color: "var(--text-heading)" }}>
+                    {action.title}
+                  </h3>
+                  {action.title === "Requests" && pendingRequests.length > 0 && (
+                    <span
+                      className="inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+                      style={{ backgroundColor: "#6366f1" }}
+                    >
+                      {pendingRequests.length}
+                    </span>
+                  )}
+                </div>
 
                 <p className="mt-1 text-xs leading-5" style={secondaryText}>
                   {action.description}

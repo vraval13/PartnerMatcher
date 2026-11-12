@@ -6,6 +6,18 @@ import type { ReceivedRequest, ConnectionStatus } from "@/lib/connections/http";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 function formatTimeWindow(start: string | null, end: string | null): string | null {
   if (!start || !end) return null;
   const s = new Date(start);
@@ -167,6 +179,7 @@ export default function RequestsClient() {
   const [requests, setRequests] = useState<ReceivedRequest[] | null>(null);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [sort, setSort] = useState<"desc" | "asc">("desc");
 
   useEffect(() => {
     let live = true;
@@ -185,8 +198,12 @@ export default function RequestsClient() {
     };
   }, []);
 
-  const filtered =
-    filter === "all" ? (requests ?? []) : (requests ?? []).filter((r) => r.status === filter);
+  const filtered = (
+    filter === "all" ? (requests ?? []) : (requests ?? []).filter((r) => r.status === filter)
+  ).sort((a, b) => {
+    const diff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    return sort === "desc" ? -diff : diff;
+  });
 
   // Count per filter for tab badges
   const counts: Record<Filter, number> = {
@@ -231,51 +248,104 @@ export default function RequestsClient() {
           </p>
         )}
 
-        {/* Filter tabs */}
+        {/* Summary stat tiles */}
+        {requests !== null && requests.length > 0 && (
+          <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {(
+              [
+                { label: "Total", count: counts.all, accent: "var(--text-heading)" },
+                { label: "Pending", count: counts.pending, accent: "#d97706" },
+                { label: "Accepted", count: counts.accepted, accent: "#16a34a" },
+                { label: "Declined", count: counts.rejected, accent: "#dc2626" },
+              ] as { label: string; count: number; accent: string }[]
+            ).map(({ label, count, accent }) => (
+              <div
+                key={label}
+                className="rounded-2xl border p-4"
+                style={{
+                  backgroundColor: "var(--bg-card)",
+                  borderColor: "var(--border-card)",
+                }}
+              >
+                <p className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+                  {label}
+                </p>
+                <p
+                  className="mt-1 text-2xl font-bold tracking-tight"
+                  style={{ color: accent, fontVariantNumeric: "tabular-nums" }}
+                >
+                  {count}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Filter tabs + sort toggle */}
         {requests !== null && (
-          <div
-            className="mb-6 flex flex-wrap gap-2"
-            role="tablist"
-            aria-label="Filter requests by status"
-          >
-            {FILTERS.map(({ key, label }) => {
-              const active = filter === key;
-              const count = counts[key];
-              if (key !== "all" && count === 0) return null;
-              return (
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+            <div
+              className="flex flex-wrap gap-2"
+              role="tablist"
+              aria-label="Filter requests by status"
+            >
+              {FILTERS.map(({ key, label }) => {
+                const active = filter === key;
+                const count = counts[key];
+                if (key !== "all" && count === 0) return null;
+                return (
+                  <button
+                    key={key}
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setFilter(key)}
+                    className="flex items-center gap-1.5 rounded-xl border px-4 py-2 text-xs font-semibold transition"
+                    style={{
+                      backgroundColor: active ? "var(--text-heading)" : "var(--bg-card)",
+                      color: active ? "var(--bg-page)" : "var(--text-sub)",
+                      borderColor: active ? "var(--text-heading)" : "var(--border-card)",
+                    }}
+                  >
+                    {label}
+                    {count > 0 && (
+                      <span
+                        className="inline-flex items-center justify-center rounded-full text-xs"
+                        style={{
+                          minWidth: "18px",
+                          height: "18px",
+                          padding: "0 4px",
+                          background: active ? "rgba(255,255,255,0.25)" : "var(--bg-row)",
+                          color: active ? "inherit" : "var(--text-muted)",
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Sort toggle — newest / oldest */}
+            <div
+              className="flex gap-1 rounded-xl border p-1"
+              style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-card)" }}
+            >
+              {(["desc", "asc"] as const).map((dir) => (
                 <button
-                  key={key}
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => setFilter(key)}
-                  className="flex items-center gap-1.5 rounded-xl border px-4 py-2 text-xs font-semibold transition"
+                  key={dir}
+                  onClick={() => setSort(dir)}
+                  className="rounded-lg px-3 py-1.5 text-xs font-semibold transition"
                   style={{
-                    backgroundColor: active ? "var(--text-heading)" : "var(--bg-card)",
-                    color: active ? "var(--bg-page)" : "var(--text-sub)",
-                    borderColor: active ? "var(--text-heading)" : "var(--border-card)",
+                    backgroundColor: sort === dir ? "var(--text-heading)" : "transparent",
+                    color: sort === dir ? "var(--bg-page)" : "var(--text-muted)",
                   }}
                 >
-                  {label}
-                  {count > 0 && (
-                    <span
-                      className="inline-flex items-center justify-center rounded-full text-xs"
-                      style={{
-                        minWidth: "18px",
-                        height: "18px",
-                        padding: "0 4px",
-                        background: active
-                          ? "rgba(255,255,255,0.25)"
-                          : "var(--bg-row)",
-                        color: active ? "inherit" : "var(--text-muted)",
-                        fontVariantNumeric: "tabular-nums",
-                      }}
-                    >
-                      {count}
-                    </span>
-                  )}
+                  {dir === "desc" ? "Newest" : "Oldest"}
                 </button>
-              );
-            })}
+              ))}
+            </div>
           </div>
         )}
 
