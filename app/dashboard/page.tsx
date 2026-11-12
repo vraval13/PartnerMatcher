@@ -50,7 +50,9 @@ export default async function DashboardPage() {
 
   const { data: rawAccepted } = await supabase
     .from("connections")
-    .select("id, requester_id, receiver_id, session_topic, proposed_start, proposed_end, created_at")
+    .select(
+      "id, requester_id, receiver_id, session_topic, proposed_start, proposed_end, created_at"
+    )
     .or(`requester_id.eq.${user.id},receiver_id.eq.${user.id}`)
     .eq("status", "accepted")
     .order("created_at", { ascending: false })
