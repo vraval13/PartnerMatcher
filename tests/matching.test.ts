@@ -92,6 +92,49 @@ test("US04: exclude unrelated topic/course, no overlap, self, private and archiv
   );
   assert.deepEqual(results, []);
 });
+test("US-07: exam preparation requires the same normalized exam subject", () => {
+  const exam = goal({
+    information_version: 2,
+    category: "exam_prep",
+    subject_or_skill: "  Calculus Final ",
+    proficiency_level: "intermediate",
+    mode: null,
+    institution: null,
+    course_code: null,
+    topic: null,
+  });
+  const results = rankCandidates(
+    exam,
+    [
+      candidate({
+        ...exam,
+        id: "exam-match",
+        user_id: "other",
+        subject_or_skill: "calculus   final",
+        proficiency_level: "advanced",
+      }),
+      candidate({
+        ...exam,
+        id: "wrong-exam",
+        user_id: "other-2",
+        subject_or_skill: "Linear Algebra Final",
+      }),
+      candidate({
+        ...exam,
+        id: "wrong-category",
+        user_id: "other-3",
+        category: "skill_practice",
+      }),
+    ],
+    now
+  );
+  assert.deepEqual(
+    results.map((result) => result.candidate_goal_id),
+    ["exam-match"]
+  );
+  assert.equal(results[0].components.topic, 100);
+  assert.equal(results[0].urgency_multiplier, 1);
+});
 test("US04: timezone conversion and partial overlap are measurable", () => {
   const results = rankCandidates(
     goal(),

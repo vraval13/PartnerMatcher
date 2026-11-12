@@ -32,13 +32,16 @@ test("migration: actual Postgres constraints, transaction rollback and RLS permi
   const db = new PGlite();
   try {
     await db.exec(
-      `create role anon; create role authenticated; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; grant usage on schema auth,public to anon,authenticated; grant execute on function auth.uid() to anon,authenticated; insert into auth.users values('${alice}'),('${bob}');`
+      `create role anon; create role authenticated; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; grant usage on schema auth,public to anon,authenticated; grant execute on function auth.uid() to anon,authenticated; insert into auth.users values('${alice}'),('${bob}'); create table public.profiles(user_id uuid primary key references auth.users(id),is_discoverable boolean not null default true); insert into public.profiles(user_id) values('${alice}'),('${bob}'); alter table public.profiles enable row level security; grant select,update on public.profiles to authenticated; create policy profiles_read on public.profiles for select to authenticated using(true); create policy profiles_update on public.profiles for update to authenticated using(user_id=(select auth.uid())) with check(user_id=(select auth.uid()));`
     );
     const legacyMigration = readdirSync("supabase/migrations").find((f) =>
       f.endsWith("_course_assignment_matching.sql")
     )!;
     const informationMigration = readdirSync("supabase/migrations").find((f) =>
       f.endsWith("_us01_matching_information.sql")
+    )!;
+    const examPauseMigration = readdirSync("supabase/migrations").find((f) =>
+      f.endsWith("_us07_us16_exam_pause.sql")
     )!;
     await db.exec(readFileSync(`supabase/migrations/${legacyMigration}`, "utf8"));
     await db.exec(`set role authenticated; set request.jwt.claim.sub='${alice}';`);
@@ -52,6 +55,7 @@ test("migration: actual Postgres constraints, transaction rollback and RLS permi
     const legacy = await create(payload);
     await db.exec("reset role");
     await db.exec(readFileSync(`supabase/migrations/${informationMigration}`, "utf8"));
+    await db.exec(readFileSync(`supabase/migrations/${examPauseMigration}`, "utf8"));
     await db.exec(`set role authenticated; set request.jwt.claim.sub='${alice}';`);
     const legacyRow = (
       await db.query<{
@@ -239,6 +243,32 @@ test("migration: actual Postgres constraints, transaction rollback and RLS permi
       "Listed goal readable by signed-in peer"
     );
     assert.equal((await db.query("select * from public.matching_availability")).rows.length, 1);
+    await db.exec(`set request.jwt.claim.sub='${alice}';`);
+    await db.query("update public.profiles set matching_paused=true where user_id=$1", [alice]);
+    await db.exec(`set request.jwt.claim.sub='${bob}';`);
+    assert.equal(
+      (await db.query("select * from public.matching_goals")).rows.length,
+      0,
+      "Paused owner is hidden from new peer discovery"
+    );
+    assert.equal(
+      (await db.query("select * from public.matching_availability")).rows.length,
+      0,
+      "Paused owner's slots are hidden with the goal"
+    );
+    await db.exec(`set request.jwt.claim.sub='${alice}';`);
+    assert.equal(
+      (await db.query("select * from public.matching_goals where id=$1", [own])).rows.length,
+      1,
+      "Pause does not remove the owner's goal"
+    );
+    await db.query("update public.profiles set matching_paused=false where user_id=$1", [alice]);
+    await db.exec(`set request.jwt.claim.sub='${bob}';`);
+    assert.equal(
+      (await db.query("select * from public.matching_goals")).rows.length,
+      1,
+      "Resuming restores listed-goal discovery"
+    );
     await db.exec(`set role anon; set request.jwt.claim.sub='';`);
     await assert.rejects(db.query("select * from public.matching_goals"));
     await assert.rejects(

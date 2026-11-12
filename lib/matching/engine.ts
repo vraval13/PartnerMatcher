@@ -64,8 +64,31 @@ export class TimezoneValidationError extends ValidationError {
     this.name = "TimezoneValidationError";
   }
 }
-export function normalized(value: string | null) {
+export function normalized(value: string | null | undefined) {
   return (value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function hasCompatibleScope(query: GoalInput, candidate: GoalInput) {
+  if (query.information_version === 2 && query.category === "exam_prep") {
+    return (
+      candidate.information_version === 2 &&
+      candidate.category === "exam_prep" &&
+      normalized(candidate.subject_or_skill) === normalized(query.subject_or_skill)
+    );
+  }
+
+  if (query.category === "skill_practice") return false;
+
+  if (
+    candidate.mode !== query.mode ||
+    normalized(candidate.institution) !== normalized(query.institution) ||
+    normalized(candidate.course_code) !== normalized(query.course_code)
+  )
+    return false;
+
+  return query.mode === "assignment"
+    ? candidate.assignment_id === query.assignment_id
+    : normalized(candidate.topic) === normalized(query.topic);
 }
 function text(value: unknown, name: string, max: number, required = true): string {
   if (typeof value !== "string" || value.length > max || (required && !value.trim()))
@@ -286,16 +309,7 @@ export function rankCandidates(
         candidate.user_id === query.user_id ||
         !candidate.is_listed ||
         candidate.archived_at ||
-        candidate.mode !== query.mode ||
-        normalized(candidate.institution) !== normalized(query.institution) ||
-        normalized(candidate.course_code) !== normalized(query.course_code)
-      )
-        return [];
-      // Eligibility always precedes scoring. Assignment IDs remain case-sensitive.
-      if (
-        query.mode === "assignment"
-          ? candidate.assignment_id !== query.assignment_id
-          : normalized(candidate.topic) !== normalized(query.topic)
+        !hasCompatibleScope(query, candidate)
       )
         return [];
       try {
@@ -309,7 +323,9 @@ export function rankCandidates(
       );
       const overlap = duration(common);
       if (!overlap) return [];
-      const topic = normalized(candidate.topic) === normalized(query.topic) ? 100 : 0;
+      // Candidate eligibility already guarantees an exact course topic, assignment,
+      // or exam subject match. Keep the existing 40% component contract for US-04/05.
+      const topic = 100;
       const availability = Math.min(100, (100 * overlap) / duration(querySlots));
       const location =
         query.location_preference === "either" || candidate.location_preference === "either"
@@ -343,6 +359,9 @@ export function rankCandidates(
           matched_user_id: candidate.user_id,
           candidate_goal_id: candidate.id,
           display_name: candidate.display_name,
+          category: candidate.category,
+          subject_or_skill: candidate.subject_or_skill,
+          proficiency_level: candidate.proficiency_level,
           course_code: candidate.course_code,
           topic: candidate.topic,
           assignment_id: candidate.assignment_id,

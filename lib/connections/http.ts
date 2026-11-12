@@ -14,17 +14,20 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Subset of matching_goals columns needed for eligibility checking. */
 const GOAL_FIELDS =
-  "id,user_id,mode,institution_key,course_key,topic_key,assignment_id,is_listed,archived_at";
+  "id,user_id,information_version,category,subject_or_skill_key,mode,institution_key,course_key,topic_key,assignment_id,is_listed,archived_at";
 
 // ── types ────────────────────────────────────────────────────────────────────
 
 type GoalRow = {
   id: string;
   user_id: string;
-  mode: string;
-  institution_key: string;
-  course_key: string;
-  topic_key: string;
+  information_version: number;
+  category: string | null;
+  subject_or_skill_key: string | null;
+  mode: string | null;
+  institution_key: string | null;
+  course_key: string | null;
+  topic_key: string | null;
   assignment_id: string | null;
   is_listed: boolean;
   archived_at: string | null;
@@ -148,6 +151,15 @@ export function isEligibleCandidate(own: GoalRow, candidate: GoalRow | null): bo
   if (!candidate) return false;
   if (!candidate.is_listed || candidate.archived_at) return false;
   if (candidate.user_id === own.user_id) return false;
+  if (own.information_version === 2 && own.category === "exam_prep") {
+    return (
+      candidate.information_version === 2 &&
+      candidate.category === "exam_prep" &&
+      Boolean(own.subject_or_skill_key) &&
+      candidate.subject_or_skill_key === own.subject_or_skill_key
+    );
+  }
+  if (own.category === "skill_practice") return false;
   if (candidate.mode !== own.mode) return false;
   if (candidate.institution_key !== own.institution_key) return false;
   if (candidate.course_key !== own.course_key) return false;

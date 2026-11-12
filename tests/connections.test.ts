@@ -30,6 +30,9 @@ const connId = "55555555-5555-4555-8555-555555555555";
 const ownGoal = {
   id: goalId,
   user_id: requesterId,
+  information_version: 2,
+  category: "course",
+  subject_or_skill_key: "react hooks",
   mode: "course",
   institution_key: "nyu",
   course_key: "cs-gy 6233",
@@ -42,6 +45,9 @@ const ownGoal = {
 const candidateGoal = {
   id: candGoalId,
   user_id: receiverId,
+  information_version: 2,
+  category: "course",
+  subject_or_skill_key: "react hooks",
   mode: "course",
   institution_key: "nyu",
   course_key: "cs-gy 6233",
@@ -177,6 +183,31 @@ test("US-08 AC2: isEligibleCandidate uses assignment_id equality for assignment 
   };
   assert.equal(isEligibleCandidate(assignOwn, assignCand), true);
   assert.equal(isEligibleCandidate(assignOwn, { ...assignCand, assignment_id: "HW-02" }), false);
+});
+test("US-07/US-08: an exact exam-subject match remains eligible for a connection request", () => {
+  const examOwn = {
+    ...ownGoal,
+    category: "exam_prep",
+    subject_or_skill_key: "calculus final",
+    mode: null,
+    institution_key: null,
+    course_key: null,
+    topic_key: null,
+  };
+  const examCandidate = {
+    ...candidateGoal,
+    category: "exam_prep",
+    subject_or_skill_key: "calculus final",
+    mode: null,
+    institution_key: null,
+    course_key: null,
+    topic_key: null,
+  };
+  assert.equal(isEligibleCandidate(examOwn, examCandidate), true);
+  assert.equal(
+    isEligibleCandidate(examOwn, { ...examCandidate, subject_or_skill_key: "physics final" }),
+    false
+  );
 });
 
 // ── HTTP handler tests ────────────────────────────────────────────────────────

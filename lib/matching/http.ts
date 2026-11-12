@@ -134,7 +134,7 @@ export async function findMatches(db: SupabaseClient, request: Request, now = ne
     if (own.error) throw own.error;
     if (!own.data) return reply({ error: "Goal not found." }, 404);
     const query = goal(own.data as DBGoal);
-    if (query.information_version === 2 && query.category !== "course")
+    if (query.information_version === 2 && query.category === "skill_practice")
       return reply(
         {
           error:
@@ -150,14 +150,25 @@ export async function findMatches(db: SupabaseClient, request: Request, now = ne
       .select(selection)
       .eq("is_listed", true)
       .is("archived_at", null)
-      .neq("user_id", id)
-      .eq("mode", query.mode)
-      .eq("institution_key", query.institution!.trim().replace(/\s+/g, " ").toLowerCase())
-      .eq("course_key", query.course_code!.trim().replace(/\s+/g, " ").toLowerCase());
-    fetch =
-      query.mode === "assignment"
-        ? fetch.eq("assignment_id", query.assignment_id!)
-        : fetch.eq("topic_key", query.topic!.trim().replace(/\s+/g, " ").toLowerCase());
+      .neq("user_id", id);
+    if (query.information_version === 2 && query.category === "exam_prep") {
+      fetch = fetch
+        .eq("information_version", 2)
+        .eq("category", "exam_prep")
+        .eq(
+          "subject_or_skill_key",
+          query.subject_or_skill!.trim().replace(/\s+/g, " ").toLowerCase()
+        );
+    } else {
+      fetch = fetch
+        .eq("mode", query.mode)
+        .eq("institution_key", query.institution!.trim().replace(/\s+/g, " ").toLowerCase())
+        .eq("course_key", query.course_code!.trim().replace(/\s+/g, " ").toLowerCase());
+      fetch =
+        query.mode === "assignment"
+          ? fetch.eq("assignment_id", query.assignment_id!)
+          : fetch.eq("topic_key", query.topic!.trim().replace(/\s+/g, " ").toLowerCase());
+    }
     // Fetch one over the supported cap; never silently rank an incomplete candidate set.
     const { data, error } = await fetch.order("id").limit(1000);
     if (error) throw error;

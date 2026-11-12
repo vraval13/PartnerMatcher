@@ -294,29 +294,63 @@ test("timezone validation rejects fixed offsets before calling the RPC", async (
     ]);
   }
 });
-test("US-01: exam and skill goals return unsupported-category without course matching", async () => {
-  for (const category of ["exam_prep", "skill_practice"]) {
-    const response = await findMatches(
-      db((url) => {
-        if (!url.searchParams.has("id")) throw new Error("Must not query candidates");
-        return {
-          ...stored,
-          information_version: 2,
-          category,
-          subject_or_skill: "Calculus",
-          proficiency_level: "beginner",
-          mode: null,
-          institution: null,
-          course_code: null,
-          topic: null,
-        };
-      }),
-      request({ goal_id: goalId }),
-      now
-    );
-    assert.equal(response.status, 422);
-    assert.equal((await response.json()).code, "UNSUPPORTED_MATCHING_CATEGORY");
-  }
+test("US-07: exam preparation search uses exact normalized subject and ranks matches", async () => {
+  const exam = {
+    ...stored,
+    information_version: 2,
+    category: "exam_prep",
+    subject_or_skill: "Calculus Final",
+    proficiency_level: "beginner",
+    mode: null,
+    institution: null,
+    course_code: null,
+    topic: null,
+  };
+  const response = await findMatches(
+    db((url) => {
+      if (url.searchParams.has("id")) return exam;
+      assert.equal(url.searchParams.get("information_version"), "eq.2");
+      assert.equal(url.searchParams.get("category"), "eq.exam_prep");
+      assert.equal(url.searchParams.get("subject_or_skill_key"), "eq.calculus final");
+      return [
+        {
+          ...exam,
+          id: "33333333-3333-4333-8333-333333333333",
+          user_id: "other",
+          display_name: "Exam Partner",
+          is_listed: true,
+        },
+      ];
+    }),
+    request({ goal_id: goalId }),
+    now
+  );
+  assert.equal(response.status, 200);
+  const data = await response.json();
+  assert.equal(data.matches[0].subject_or_skill, "Calculus Final");
+  assert.equal(data.matches[0].final_score, 100);
+});
+test("US-07: skill goals remain assigned to their separate story", async () => {
+  const response = await findMatches(
+    db((url) => {
+      if (!url.searchParams.has("id")) throw new Error("Must not query candidates");
+      return {
+        ...stored,
+        information_version: 2,
+        category: "skill_practice",
+        subject_or_skill: "Japanese",
+        proficiency_level: "beginner",
+        mode: null,
+        institution: null,
+        course_code: null,
+        topic: null,
+      };
+    }),
+    request({ goal_id: goalId }),
+    now
+  );
+  assert.equal(response.status, 422);
+  assert.equal((await response.json()).code, "UNSUPPORTED_MATCHING_CATEGORY");
 });
 test("database outage returns actionable 503 without raw database details", async () => {
   const response = await findMatches(
