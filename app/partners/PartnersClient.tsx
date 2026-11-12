@@ -78,7 +78,9 @@ export default function PartnersClient() {
   const [connectBusy, setConnectBusy] = useState(false);
   const [connectError, setConnectError] = useState("");
   const [connectFieldErrors, setConnectFieldErrors] = useState<MatchingFieldError[]>([]);
-  const [sentConnections, setSentConnections] = useState<Record<string, { id: string; status: string }>>({});
+  const [sentConnections, setSentConnections] = useState<
+    Record<string, { id: string; status: string }>
+  >({});
   useEffect(() => {
     let live = true;
     api("/api/v1/matching-goals")
@@ -639,7 +641,10 @@ export default function PartnersClient() {
                                 }
                               }}
                               className="rounded-xl border px-3 py-2 text-xs font-semibold opacity-70 hover:opacity-100 transition"
-                              style={{ borderColor: "var(--border-card)", color: "var(--text-sub)" }}
+                              style={{
+                                borderColor: "var(--border-card)",
+                                color: "var(--text-sub)",
+                              }}
                             >
                               Cancel
                             </button>

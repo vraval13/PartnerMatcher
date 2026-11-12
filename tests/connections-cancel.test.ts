@@ -50,22 +50,25 @@ function db(lookup: (url: URL, init?: RequestInit) => unknown, signedIn = true) 
 // ── cancelConnectionRequest helpers ──────────────────────────────────────────
 
 /** Builds a stub that handles both the SELECT (fetch) and UPDATE for cancel. */
-function cancelDb(opts: {
-  fetchRow?: { id: string; status: string } | null;
-  updateRow?: { id: string; status: string } | null;
-  dbError?: boolean;
-} = {}) {
+function cancelDb(
+  opts: {
+    fetchRow?: { id: string; status: string } | null;
+    updateRow?: { id: string; status: string } | null;
+    dbError?: boolean;
+  } = {}
+) {
   const fetchRow = opts.fetchRow !== undefined ? opts.fetchRow : { id: connId, status: "pending" };
-  const updateRow = opts.updateRow !== undefined ? opts.updateRow : { id: connId, status: "cancelled" };
+  const updateRow =
+    opts.updateRow !== undefined ? opts.updateRow : { id: connId, status: "cancelled" };
 
   return db((url, init) => {
     // Both SELECT and UPDATE hit /rest/v1/connections with connection id filter
     if (url.pathname === "/rest/v1/connections") {
       if (opts.dbError) {
-        return new Response(
-          JSON.stringify({ code: "PGRST301", message: "db error" }),
-          { status: 500, headers: { "Content-Type": "application/json" } }
-        );
+        return new Response(JSON.stringify({ code: "PGRST301", message: "db error" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        });
       }
       if (init?.method === "PATCH") {
         return updateRow;
@@ -80,7 +83,9 @@ function cancelDb(opts: {
 // ── cancelConnectionRequest: input validation ─────────────────────────────────
 
 test("US-12: invalid UUID returns 422 without DB query", async () => {
-  const client = db(() => { throw new Error("Must not query DB"); });
+  const client = db(() => {
+    throw new Error("Must not query DB");
+  });
   const res = await cancelConnectionRequest(client, "not-a-uuid");
   assert.equal(res.status, 422);
   assert.equal((await res.json()).code, "INVALID_INPUT");
@@ -184,10 +189,10 @@ function sentDb(overrides: { connections?: unknown; goals?: unknown; error?: boo
   return db((url) => {
     if (url.pathname === "/rest/v1/connections" && url.searchParams.has("requester_id")) {
       if (overrides.error) {
-        return new Response(
-          JSON.stringify({ code: "PGRST301", message: "db error" }),
-          { status: 500, headers: { "Content-Type": "application/json" } }
-        );
+        return new Response(JSON.stringify({ code: "PGRST301", message: "db error" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        });
       }
       return overrides.connections !== undefined ? overrides.connections : [sentRow];
     }

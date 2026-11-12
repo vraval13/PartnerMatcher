@@ -694,7 +694,11 @@ export function DashboardClient({
                           </span>
                         </div>
                         {timeWindow && (
-                          <p suppressHydrationWarning className="mt-1 text-xs" style={secondaryText}>
+                          <p
+                            suppressHydrationWarning
+                            className="mt-1 text-xs"
+                            style={secondaryText}
+                          >
                             {timeWindow}
                           </p>
                         )}
@@ -703,7 +707,11 @@ export function DashboardClient({
                             &ldquo;{req.message}&rdquo;
                           </p>
                         )}
-                        <p suppressHydrationWarning className="mt-1.5 text-xs" style={{ color: "var(--text-muted)" }}>
+                        <p
+                          suppressHydrationWarning
+                          className="mt-1.5 text-xs"
+                          style={{ color: "var(--text-muted)" }}
+                        >
                           Received {receivedOn}
                         </p>
                       </div>
@@ -766,7 +774,9 @@ export function DashboardClient({
                       ? `${startDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · ${startDate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} – ${endDate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`
                       : null;
                   const sentOn = new Date(req.created_at).toLocaleDateString(undefined, {
-                    month: "short", day: "numeric", year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
                   });
                   const isConfirming = confirmingId === req.id;
                   return (
@@ -788,17 +798,29 @@ export function DashboardClient({
                           </p>
                           <span
                             className="rounded-full border px-2 py-0.5 text-xs font-medium"
-                            style={{ borderColor: "rgba(217,119,6,0.4)", color: "#b45309", backgroundColor: "rgba(217,119,6,0.07)" }}
+                            style={{
+                              borderColor: "rgba(217,119,6,0.4)",
+                              color: "#b45309",
+                              backgroundColor: "rgba(217,119,6,0.07)",
+                            }}
                           >
                             awaiting
                           </span>
                         </div>
                         {timeWindow && (
-                          <p suppressHydrationWarning className="mt-1 text-xs" style={secondaryText}>
+                          <p
+                            suppressHydrationWarning
+                            className="mt-1 text-xs"
+                            style={secondaryText}
+                          >
                             {timeWindow}
                           </p>
                         )}
-                        <p suppressHydrationWarning className="mt-1.5 text-xs" style={{ color: "var(--text-muted)" }}>
+                        <p
+                          suppressHydrationWarning
+                          className="mt-1.5 text-xs"
+                          style={{ color: "var(--text-muted)" }}
+                        >
                           Sent {sentOn}
                         </p>
                       </div>
@@ -815,7 +837,11 @@ export function DashboardClient({
                                 onClick={() => cancelSent(req.id)}
                                 disabled={cancelBusy}
                                 className="rounded-lg px-2.5 py-1 text-xs font-semibold transition"
-                                style={{ backgroundColor: "#dc2626", color: "#fff", opacity: cancelBusy ? 0.6 : 1 }}
+                                style={{
+                                  backgroundColor: "#dc2626",
+                                  color: "#fff",
+                                  opacity: cancelBusy ? 0.6 : 1,
+                                }}
                               >
                                 {cancelBusy ? "…" : "Yes"}
                               </button>
@@ -823,7 +849,10 @@ export function DashboardClient({
                                 onClick={() => setConfirmingId(null)}
                                 disabled={cancelBusy}
                                 className="rounded-lg border px-2.5 py-1 text-xs font-semibold transition"
-                                style={{ borderColor: "var(--border-card)", color: "var(--text-sub)" }}
+                                style={{
+                                  borderColor: "var(--border-card)",
+                                  color: "var(--text-sub)",
+                                }}
                               >
                                 No
                               </button>
@@ -834,7 +863,10 @@ export function DashboardClient({
                             onClick={() => setConfirmingId(req.id)}
                             disabled={cancelBusy}
                             className="rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:border-red-400 hover:text-red-500"
-                            style={{ borderColor: "var(--border-card)", color: "var(--text-muted)" }}
+                            style={{
+                              borderColor: "var(--border-card)",
+                              color: "var(--text-muted)",
+                            }}
                           >
                             Cancel
                           </button>
@@ -908,14 +940,14 @@ export function DashboardClient({
                     {action.title}
                   </h3>
                   {action.title === "Requests" &&
-                    (pendingRequests.length + visibleSent.length) > 0 && (
-                    <span
-                      className="inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
-                      style={{ backgroundColor: "#6366f1" }}
-                    >
-                      {pendingRequests.length + visibleSent.length}
-                    </span>
-                  )}
+                    pendingRequests.length + visibleSent.length > 0 && (
+                      <span
+                        className="inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+                        style={{ backgroundColor: "#6366f1" }}
+                      >
+                        {pendingRequests.length + visibleSent.length}
+                      </span>
+                    )}
                 </div>
 
                 <p className="mt-1 text-xs leading-5" style={secondaryText}>

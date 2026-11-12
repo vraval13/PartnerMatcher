@@ -186,7 +186,9 @@ function StatTiles({ tiles }: { tiles: { label: string; count: number; accent: s
           className="rounded-2xl border p-4"
           style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-card)" }}
         >
-          <p className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>{label}</p>
+          <p className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+            {label}
+          </p>
           <p
             className="mt-1 text-2xl font-bold tracking-tight"
             style={{ color: accent, fontVariantNumeric: "tabular-nums" }}
@@ -231,13 +233,26 @@ function EmptyState({ message, sub }: { message: string; sub: string }) {
         className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
         style={{ backgroundColor: "var(--bg-row)", color: "var(--text-heading)" }}
       >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
           <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
         </svg>
       </div>
-      <h2 className="text-sm font-bold" style={{ color: "var(--text-heading)" }}>{message}</h2>
-      <p className="mt-2 max-w-xs text-xs leading-6" style={{ color: "var(--text-muted)" }}>{sub}</p>
+      <h2 className="text-sm font-bold" style={{ color: "var(--text-heading)" }}>
+        {message}
+      </h2>
+      <p className="mt-2 max-w-xs text-xs leading-6" style={{ color: "var(--text-muted)" }}>
+        {sub}
+      </p>
     </div>
   );
 }
@@ -273,7 +288,11 @@ function ReceivedCard({ req }: { req: ReceivedRequest }) {
         </div>
         {timeWindow && (
           // suppressHydrationWarning: locale-formatted time differs between Node.js (server) and browser
-          <p suppressHydrationWarning className="shrink-0 text-right text-xs" style={{ color: "var(--text-muted)" }}>
+          <p
+            suppressHydrationWarning
+            className="shrink-0 text-right text-xs"
+            style={{ color: "var(--text-muted)" }}
+          >
             {timeWindow}
           </p>
         )}
@@ -345,7 +364,11 @@ function SentCard({
           </p>
         </div>
         {timeWindow && (
-          <p suppressHydrationWarning className="shrink-0 text-right text-xs" style={{ color: "var(--text-muted)" }}>
+          <p
+            suppressHydrationWarning
+            className="shrink-0 text-right text-xs"
+            style={{ color: "var(--text-muted)" }}
+          >
             {timeWindow}
           </p>
         )}
@@ -369,8 +392,8 @@ function SentCard({
         </p>
 
         {/* AC3: cancel only shown to sender (this component is only rendered in the Sent tab) */}
-        {isPending && (
-          confirming ? (
+        {isPending &&
+          (confirming ? (
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold" style={{ color: "#b91c1c" }}>
                 Withdraw this request?
@@ -410,8 +433,7 @@ function SentCard({
             >
               Cancel request
             </button>
-          )
-        )}
+          ))}
       </div>
     </article>
   );
@@ -454,8 +476,12 @@ export default function RequestsClient() {
         if (data.error) setRecvError(data.error);
         else setRequests(data.requests ?? []);
       })
-      .catch(() => { if (live) setRecvError("Unable to load requests. Please try again."); });
-    return () => { live = false; };
+      .catch(() => {
+        if (live) setRecvError("Unable to load requests. Please try again.");
+      });
+    return () => {
+      live = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -467,8 +493,12 @@ export default function RequestsClient() {
         if (data.error) setSentError(data.error);
         else setSentRequests(data.requests ?? []);
       })
-      .catch(() => { if (live) setSentError("Unable to load sent requests. Please try again."); });
-    return () => { live = false; };
+      .catch(() => {
+        if (live) setSentError("Unable to load sent requests. Please try again.");
+      });
+    return () => {
+      live = false;
+    };
   }, []);
 
   async function cancelRequest(id: string) {
@@ -500,7 +530,9 @@ export default function RequestsClient() {
   // ── computed ──────────────────────────────────────────────────────────────
 
   const recvFiltered = (
-    recvFilter === "all" ? (requests ?? []) : (requests ?? []).filter((r) => r.status === recvFilter)
+    recvFilter === "all"
+      ? (requests ?? [])
+      : (requests ?? []).filter((r) => r.status === recvFilter)
   ).sort((a, b) => {
     const diff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
     return recvSort === "desc" ? -diff : diff;
@@ -516,7 +548,9 @@ export default function RequestsClient() {
   };
 
   const sentFiltered = (
-    sentFilter === "all" ? (sentRequests ?? []) : (sentRequests ?? []).filter((r) => r.status === sentFilter)
+    sentFilter === "all"
+      ? (sentRequests ?? [])
+      : (sentRequests ?? []).filter((r) => r.status === sentFilter)
   ).sort((a, b) => {
     const diff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
     return sentSort === "desc" ? -diff : diff;
@@ -545,7 +579,10 @@ export default function RequestsClient() {
         </Link>
 
         <div className="mt-5 mb-7">
-          <h1 className="text-3xl font-bold tracking-tight" style={{ color: "var(--text-heading)" }}>
+          <h1
+            className="text-3xl font-bold tracking-tight"
+            style={{ color: "var(--text-heading)" }}
+          >
             Connection Requests
           </h1>
           <p className="mt-2 text-sm" style={{ color: "var(--text-muted)" }}>
@@ -605,7 +642,10 @@ export default function RequestsClient() {
         {view === "received" && (
           <>
             {recvError && (
-              <p role="alert" className="mb-6 rounded-xl border border-red-400 bg-red-500/10 p-4 text-sm">
+              <p
+                role="alert"
+                className="mb-6 rounded-xl border border-red-400 bg-red-500/10 p-4 text-sm"
+              >
                 {recvError}
               </p>
             )}
@@ -651,7 +691,9 @@ export default function RequestsClient() {
 
             {recvFiltered.length > 0 && (
               <div className="space-y-4">
-                {recvFiltered.map((req) => <ReceivedCard key={req.id} req={req} />)}
+                {recvFiltered.map((req) => (
+                  <ReceivedCard key={req.id} req={req} />
+                ))}
                 <p className="pt-2 text-center text-xs" style={{ color: "var(--text-muted)" }}>
                   Showing {recvFiltered.length} of {requests?.length} request
                   {requests?.length !== 1 ? "s" : ""}
@@ -665,12 +707,18 @@ export default function RequestsClient() {
         {view === "sent" && (
           <>
             {cancelError && (
-              <p role="alert" className="mb-6 rounded-xl border border-red-400 bg-red-500/10 p-4 text-sm">
+              <p
+                role="alert"
+                className="mb-6 rounded-xl border border-red-400 bg-red-500/10 p-4 text-sm"
+              >
                 {cancelError}
               </p>
             )}
             {sentError && (
-              <p role="alert" className="mb-6 rounded-xl border border-red-400 bg-red-500/10 p-4 text-sm">
+              <p
+                role="alert"
+                className="mb-6 rounded-xl border border-red-400 bg-red-500/10 p-4 text-sm"
+              >
                 {sentError}
               </p>
             )}
@@ -722,7 +770,10 @@ export default function RequestsClient() {
                     req={req}
                     confirmingId={confirmingId}
                     cancelBusy={cancelBusy}
-                    onStartConfirm={(id) => { setConfirmingId(id); setCancelError(""); }}
+                    onStartConfirm={(id) => {
+                      setConfirmingId(id);
+                      setCancelError("");
+                    }}
                     onConfirm={cancelRequest}
                     onKeep={() => setConfirmingId(null)}
                   />
