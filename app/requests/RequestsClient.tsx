@@ -247,9 +247,23 @@ function EmptyState({ message, sub }: { message: string; sub: string }) {
 
 // ── received request card ─────────────────────────────────────────────────────
 
-function ReceivedCard({ req }: { req: ReceivedRequest }) {
+function ReceivedCard({
+  req,
+  respondBusy,
+  respondingId,
+  onAccept,
+  onDecline,
+}: {
+  req: ReceivedRequest;
+  respondBusy: boolean;
+  respondingId: string | null;
+  onAccept: (id: string) => void;
+  onDecline: (id: string) => void;
+}) {
   const timeWindow = formatTimeWindow(req.proposed_start, req.proposed_end);
   const isPending = req.status === "pending";
+  const isResponding = respondingId === req.id;
+
   return (
     <article
       className="rounded-2xl border p-5"
@@ -257,6 +271,7 @@ function ReceivedCard({ req }: { req: ReceivedRequest }) {
         backgroundColor: "var(--bg-card)",
         borderColor: "var(--border-card)",
         opacity: isPending ? 1 : 0.85,
+        transition: "opacity 0.15s",
       }}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -293,14 +308,47 @@ function ReceivedCard({ req }: { req: ReceivedRequest }) {
           {req.message}
         </blockquote>
       )}
-      <p suppressHydrationWarning className="mt-3 text-xs" style={{ color: "var(--text-muted)" }}>
-        Received {formatDate(req.created_at)}
-        {!isPending && (
-          <span className="ml-2 opacity-70">
-            · {STATUS_LABEL[req.status]} — no further action required
-          </span>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <p suppressHydrationWarning className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Received {formatDate(req.created_at)}
+          {!isPending && (
+            <span className="ml-2 opacity-70">
+              · {STATUS_LABEL[req.status]} — no further action required
+            </span>
+          )}
+        </p>
+
+        {/* AC3: respond buttons only shown to receiver (this is the Received tab) */}
+        {isPending && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onDecline(req.id)}
+              disabled={respondBusy}
+              className="rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:border-red-400 hover:text-red-500"
+              style={{
+                backgroundColor: "var(--bg-card)",
+                borderColor: "var(--border-card)",
+                color: "var(--text-sub)",
+                opacity: isResponding && respondBusy ? 0.5 : 1,
+              }}
+            >
+              {isResponding && respondBusy ? "…" : "Decline"}
+            </button>
+            <button
+              onClick={() => onAccept(req.id)}
+              disabled={respondBusy}
+              className="rounded-lg px-3 py-1.5 text-xs font-semibold transition hover:opacity-85"
+              style={{
+                backgroundColor: "#16a34a",
+                color: "#fff",
+                opacity: isResponding && respondBusy ? 0.5 : 1,
+              }}
+            >
+              {isResponding && respondBusy ? "…" : "Accept"}
+            </button>
+          </div>
         )}
-      </p>
+      </div>
     </article>
   );
 }
@@ -455,6 +503,11 @@ export default function RequestsClient() {
   const [cancelBusy, setCancelBusy] = useState(false);
   const [cancelError, setCancelError] = useState("");
 
+  // respond flow (US-13)
+  const [respondingId, setRespondingId] = useState<string | null>(null);
+  const [respondBusy, setRespondBusy] = useState(false);
+  const [respondError, setRespondError] = useState("");
+
   useEffect(() => {
     let live = true;
     fetch("/api/v1/connections", { headers: { "Content-Type": "application/json" } })
@@ -512,6 +565,33 @@ export default function RequestsClient() {
       setConfirmingId(null);
     } finally {
       setCancelBusy(false);
+    }
+  }
+
+  async function respondToRequest(id: string, action: "accept" | "decline") {
+    setRespondingId(id);
+    setRespondBusy(true);
+    setRespondError("");
+    try {
+      const res = await fetch(`/api/v1/connections/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setRespondError(data.error ?? "Unable to respond. Please try again.");
+        return;
+      }
+      const newStatus = action === "accept" ? ("accepted" as const) : ("rejected" as const);
+      setRequests((prev) =>
+        (prev ?? []).map((r) => (r.id === id ? { ...r, status: newStatus } : r))
+      );
+    } catch {
+      setRespondError("Unable to respond. Please try again.");
+    } finally {
+      setRespondBusy(false);
+      setRespondingId(null);
     }
   }
 
@@ -597,6 +677,7 @@ export default function RequestsClient() {
                   setView(v);
                   if (typeof window !== "undefined") window.location.hash = v;
                   setCancelError("");
+                  setRespondError("");
                   setConfirmingId(null);
                 }}
                 className="flex items-center gap-2 rounded-xl px-5 py-2 text-sm font-semibold transition"
@@ -635,6 +716,14 @@ export default function RequestsClient() {
                 className="mb-6 rounded-xl border border-red-400 bg-red-500/10 p-4 text-sm"
               >
                 {recvError}
+              </p>
+            )}
+            {respondError && (
+              <p
+                role="alert"
+                className="mb-6 rounded-xl border border-red-400 bg-red-500/10 p-4 text-sm"
+              >
+                {respondError}
               </p>
             )}
 
@@ -680,7 +769,14 @@ export default function RequestsClient() {
             {recvFiltered.length > 0 && (
               <div className="space-y-4">
                 {recvFiltered.map((req) => (
-                  <ReceivedCard key={req.id} req={req} />
+                  <ReceivedCard
+                    key={req.id}
+                    req={req}
+                    respondBusy={respondBusy}
+                    respondingId={respondingId}
+                    onAccept={(id) => respondToRequest(id, "accept")}
+                    onDecline={(id) => respondToRequest(id, "decline")}
+                  />
                 ))}
                 <p className="pt-2 text-center text-xs" style={{ color: "var(--text-muted)" }}>
                   Showing {recvFiltered.length} of {requests?.length} request

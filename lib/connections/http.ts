@@ -399,6 +399,82 @@ export async function getSentRequests(db: SupabaseClient): Promise<Response> {
   }
 }
 
+// ── US-13: respond to a received request ─────────────────────────────────────
+
+/**
+ * Accepts or declines a pending connection request on behalf of the receiver.
+ * AC1: accept → "accepted"; decline → "rejected".
+ * AC2: only pending requests can be responded to (others → 409 NOT_RESPONDABLE).
+ * AC3: only the receiver may respond (.eq("receiver_id", userId) → 404 for anyone else).
+ */
+export async function respondToConnectionRequest(
+  db: SupabaseClient,
+  connectionId: string,
+  action: "accept" | "decline"
+): Promise<Response> {
+  try {
+    if (!UUID.test(connectionId)) {
+      return reply({ error: "A valid connection ID is required.", code: "INVALID_INPUT" }, 422);
+    }
+
+    const userId = await getAuthUserId(db);
+    if (!userId) return reply({ error: "Sign in to respond to a connection request." }, 401);
+
+    // AC3: .eq("receiver_id", userId) means only the recipient can respond
+    const { data: conn, error: fetchErr } = await db
+      .from("connections")
+      .select("id,status")
+      .eq("id", connectionId)
+      .eq("receiver_id", userId)
+      .maybeSingle();
+    if (fetchErr) throw fetchErr;
+
+    if (!conn) return reply({ error: "Connection request not found." }, 404);
+
+    // AC2: only pending requests can be responded to
+    if (conn.status !== "pending") {
+      return reply(
+        {
+          error: `This request has already been ${conn.status} and cannot be responded to.`,
+          code: "NOT_RESPONDABLE",
+          current_status: conn.status,
+        },
+        409
+      );
+    }
+
+    const newStatus = action === "accept" ? "accepted" : "rejected";
+
+    // Race guard: UPDATE filtered by status=pending
+    const { data: updated, error: updateErr } = await db
+      .from("connections")
+      .update({ status: newStatus })
+      .eq("id", connectionId)
+      .eq("receiver_id", userId)
+      .eq("status", "pending")
+      .select("id,status")
+      .maybeSingle();
+    if (updateErr) throw updateErr;
+
+    if (!updated) {
+      return reply(
+        {
+          error: "The request status changed before your response could be processed.",
+          code: "STATUS_CHANGED",
+        },
+        409
+      );
+    }
+
+    return reply({ id: connectionId, status: newStatus }, 200);
+  } catch (error) {
+    if (error instanceof ConnectionRequestError) {
+      return reply({ error: error.message, code: error.code }, error.status);
+    }
+    return reply({ error: "Unable to process the response. Please try again later." }, 503);
+  }
+}
+
 // ── US-12: cancel a sent request ─────────────────────────────────────────────
 
 export async function cancelConnectionRequest(

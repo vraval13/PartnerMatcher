@@ -178,6 +178,32 @@ export function DashboardClient({
   const [cancelledIds, setCancelledIds] = useState<Set<string>>(new Set());
   const [cancelBusy, setCancelBusy] = useState(false);
 
+  // US-13: respond to received request from dashboard
+  const [respondingId, setRespondingId] = useState<string | null>(null);
+  const [respondedIds, setRespondedIds] = useState<Set<string>>(new Set());
+  const [respondBusy, setRespondBusy] = useState(false);
+
+  async function respondToReceived(id: string, action: "accept" | "decline") {
+    setRespondingId(id);
+    setRespondBusy(true);
+    try {
+      const res = await fetch(`/api/v1/connections/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      if (res.ok) {
+        setRespondedIds((prev) => new Set(prev).add(id));
+        setRespondingId(null);
+      }
+    } catch {
+      // fail silently — full respond management is at /requests
+    } finally {
+      setRespondBusy(false);
+      setRespondingId(null);
+    }
+  }
+
   async function cancelSent(id: string) {
     setCancelBusy(true);
     try {
@@ -197,6 +223,7 @@ export function DashboardClient({
   }
 
   const visibleSent = pendingSentRequests.filter((r) => !cancelledIds.has(r.id));
+  const visibleReceived = pendingRequests.filter((r) => !respondedIds.has(r.id));
   const dark = theme === "dark";
 
   const displayName =
@@ -275,8 +302,8 @@ export function DashboardClient({
             <Link
               href="/requests"
               aria-label={
-                pendingRequests.length > 0
-                  ? `${pendingRequests.length} pending connection request${pendingRequests.length !== 1 ? "s" : ""}`
+                visibleReceived.length > 0
+                  ? `${visibleReceived.length} pending connection request${visibleReceived.length !== 1 ? "s" : ""}`
                   : "Connection requests"
               }
               title="Connection requests"
@@ -288,12 +315,12 @@ export function DashboardClient({
               }}
             >
               <Icon name="inbox" size={19} />
-              {pendingRequests.length > 0 && (
+              {visibleReceived.length > 0 && (
                 <span
                   className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
                   style={{ backgroundColor: "#6366f1" }}
                 >
-                  {pendingRequests.length > 9 ? "9+" : pendingRequests.length}
+                  {visibleReceived.length > 9 ? "9+" : visibleReceived.length}
                 </span>
               )}
             </Link>
@@ -618,12 +645,12 @@ export function DashboardClient({
               <h2 className="text-base font-bold" style={{ color: "var(--text-heading)" }}>
                 Connection Requests
               </h2>
-              {pendingRequests.length > 0 && (
+              {visibleReceived.length > 0 && (
                 <span
                   className="inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-xs font-bold text-white"
                   style={{ backgroundColor: "var(--text-heading)" }}
                 >
-                  {pendingRequests.length}
+                  {visibleReceived.length}
                 </span>
               )}
             </div>
@@ -637,7 +664,7 @@ export function DashboardClient({
           </div>
 
           <div className="rounded-2xl border" style={cardStyle}>
-            {pendingRequests.length === 0 ? (
+            {visibleReceived.length === 0 ? (
               <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
                 <div
                   className="flex h-14 w-14 items-center justify-center rounded-2xl"
@@ -654,7 +681,7 @@ export function DashboardClient({
               </div>
             ) : (
               <ul role="list">
-                {pendingRequests.map((req) => {
+                {visibleReceived.map((req) => {
                   const startDate = req.proposed_start ? new Date(req.proposed_start) : null;
                   const endDate = req.proposed_end ? new Date(req.proposed_end) : null;
                   const timeWindow =
@@ -666,6 +693,7 @@ export function DashboardClient({
                     day: "numeric",
                     year: "numeric",
                   });
+                  const isResponding = respondingId === req.id;
                   return (
                     <li
                       key={req.id}
@@ -714,6 +742,34 @@ export function DashboardClient({
                         >
                           Received {receivedOn}
                         </p>
+                      </div>
+
+                      {/* AC3: respond buttons only shown to receiver (this is receiver's dashboard) */}
+                      <div className="shrink-0 flex flex-col gap-1.5">
+                        <button
+                          onClick={() => respondToReceived(req.id, "accept")}
+                          disabled={respondBusy}
+                          className="rounded-lg px-2.5 py-1 text-xs font-semibold transition hover:opacity-85"
+                          style={{
+                            backgroundColor: "#16a34a",
+                            color: "#fff",
+                            opacity: isResponding && respondBusy ? 0.6 : 1,
+                          }}
+                        >
+                          {isResponding && respondBusy ? "…" : "Accept"}
+                        </button>
+                        <button
+                          onClick={() => respondToReceived(req.id, "decline")}
+                          disabled={respondBusy}
+                          className="rounded-lg border px-2.5 py-1 text-xs font-semibold transition hover:border-red-400 hover:text-red-500"
+                          style={{
+                            borderColor: "var(--border-card)",
+                            color: "var(--text-muted)",
+                            opacity: isResponding && respondBusy ? 0.6 : 1,
+                          }}
+                        >
+                          {isResponding && respondBusy ? "…" : "Decline"}
+                        </button>
                       </div>
                     </li>
                   );
@@ -941,12 +997,12 @@ export function DashboardClient({
                     {action.title}
                   </h3>
                   {action.title === "Requests" &&
-                    pendingRequests.length + visibleSent.length > 0 && (
+                    visibleReceived.length + visibleSent.length > 0 && (
                       <span
                         className="inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
                         style={{ backgroundColor: "#6366f1" }}
                       >
-                        {pendingRequests.length + visibleSent.length}
+                        {visibleReceived.length + visibleSent.length}
                       </span>
                     )}
                 </div>
