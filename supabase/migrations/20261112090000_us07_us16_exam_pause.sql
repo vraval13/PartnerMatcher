@@ -1,4 +1,5 @@
--- US-07 / US-16: enable exam-preparation discovery and account-level matching pause.
+-- US-06 / US-16: enable partial exam-preparation discovery and account-level matching pause.
+-- US-07 practice matching uses the existing category, normalized skill key, and weekly slots.
 begin;
 
 alter table public.profiles

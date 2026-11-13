@@ -147,11 +147,7 @@ export default function PartnersClient() {
       setGoals(data.goals);
       setSelected(saved.id);
       setMatches(null);
-      setMessage(
-        form.category !== "skill_practice"
-          ? "Goal saved. Select Find partners to search."
-          : "Matching information saved. Partner search for this category is planned for a later story."
-      );
+      setMessage("Goal saved. Select Find partners to search.");
     } catch (e) {
       if (e instanceof ApiError) setFieldErrors(e.fieldErrors);
       setError(e instanceof Error ? e.message : "Unable to save.");
@@ -279,7 +275,8 @@ export default function PartnersClient() {
     !selectedGoal ||
     selectedGoal.information_version === 1 ||
     selectedGoal.category === "course" ||
-    selectedGoal.category === "exam_prep";
+    selectedGoal.category === "exam_prep" ||
+    selectedGoal.category === "skill_practice";
   return (
     <main
       className="min-h-screen px-5 py-8"
@@ -605,8 +602,9 @@ export default function PartnersClient() {
             )}
             {selectedGoal && selectedSupportsSearch && (
               <p className="mt-4 text-xs opacity-70">
-                Weights: {selectedGoal.category === "exam_prep" ? "exam subject" : "topic"} 40% ·
-                availability 35% · location 25%.
+                {selectedGoal.category === "skill_practice"
+                  ? "Weights: skill or language 25% · availability 50% · location 25%."
+                  : `Weights: ${selectedGoal.category === "exam_prep" ? "exam subject" : "topic"} 40% · availability 35% · location 25%.`}
                 {selectedGoal.mode === "assignment" &&
                   " Assignment urgency proposal: ≤2 days ×1.2; ≤7 days ×1.1; otherwise ×1.0. Final scores may exceed 100."}
               </p>
@@ -629,6 +627,10 @@ export default function PartnersClient() {
                       <>
                         Exam prep · {m.subject_or_skill} · {m.proficiency_level}
                       </>
+                    ) : m.category === "skill_practice" ? (
+                      <>
+                        Skill / language practice · {m.subject_or_skill} · {m.proficiency_level}
+                      </>
                     ) : (
                       <>
                         {m.course_code} · {m.topic}
@@ -645,7 +647,13 @@ export default function PartnersClient() {
                     {Object.entries(m.components).map(([k, v]) => (
                       <div key={k}>
                         <dt className="capitalize opacity-70">
-                          {k === "topic" && m.category === "exam_prep" ? "Exam subject" : k}
+                          {k === "topic"
+                            ? m.category === "exam_prep"
+                              ? "Exam subject"
+                              : m.category === "skill_practice"
+                                ? "Skill or language"
+                                : "Topic"
+                            : k}
                         </dt>
                         <dd>{v}/100</dd>
                       </div>

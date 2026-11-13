@@ -159,15 +159,17 @@ export function isEligibleCandidate(own: GoalRow, candidate: GoalRow | null): bo
   if (!candidate) return false;
   if (!candidate.is_listed || candidate.archived_at) return false;
   if (candidate.user_id === own.user_id) return false;
-  if (own.information_version === 2 && own.category === "exam_prep") {
+  if (
+    own.information_version === 2 &&
+    (own.category === "exam_prep" || own.category === "skill_practice")
+  ) {
     return (
       candidate.information_version === 2 &&
-      candidate.category === "exam_prep" &&
+      candidate.category === own.category &&
       Boolean(own.subject_or_skill_key) &&
       candidate.subject_or_skill_key === own.subject_or_skill_key
     );
   }
-  if (own.category === "skill_practice") return false;
   if (candidate.mode !== own.mode) return false;
   if (candidate.institution_key !== own.institution_key) return false;
   if (candidate.course_key !== own.course_key) return false;

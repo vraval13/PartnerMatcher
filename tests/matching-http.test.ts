@@ -294,7 +294,7 @@ test("timezone validation rejects fixed offsets before calling the RPC", async (
     ]);
   }
 });
-test("US-07: exam preparation search uses exact normalized subject and ranks matches", async () => {
+test("US-06: exam preparation search uses exact normalized subject and ranks matches", async () => {
   const exam = {
     ...stored,
     information_version: 2,
@@ -330,27 +330,42 @@ test("US-07: exam preparation search uses exact normalized subject and ranks mat
   assert.equal(data.matches[0].subject_or_skill, "Calculus Final");
   assert.equal(data.matches[0].final_score, 100);
 });
-test("US-07: skill goals remain assigned to their separate story", async () => {
+test("US-07: skill practice search filters by normalized skill and returns 50% availability weight", async () => {
+  const practice = {
+    ...stored,
+    information_version: 2,
+    category: "skill_practice",
+    subject_or_skill: "Japanese Conversation",
+    proficiency_level: "beginner",
+    mode: null,
+    institution: null,
+    course_code: null,
+    topic: null,
+  };
   const response = await findMatches(
     db((url) => {
-      if (!url.searchParams.has("id")) throw new Error("Must not query candidates");
-      return {
-        ...stored,
-        information_version: 2,
-        category: "skill_practice",
-        subject_or_skill: "Japanese",
-        proficiency_level: "beginner",
-        mode: null,
-        institution: null,
-        course_code: null,
-        topic: null,
-      };
+      if (url.searchParams.has("id")) return practice;
+      assert.equal(url.searchParams.get("information_version"), "eq.2");
+      assert.equal(url.searchParams.get("category"), "eq.skill_practice");
+      assert.equal(url.searchParams.get("subject_or_skill_key"), "eq.japanese conversation");
+      return [
+        {
+          ...practice,
+          id: "33333333-3333-4333-8333-333333333333",
+          user_id: "other",
+          display_name: "Practice Partner",
+          is_listed: true,
+        },
+      ];
     }),
     request({ goal_id: goalId }),
     now
   );
-  assert.equal(response.status, 422);
-  assert.equal((await response.json()).code, "UNSUPPORTED_MATCHING_CATEGORY");
+  assert.equal(response.status, 200);
+  const data = await response.json();
+  assert.equal(data.matches[0].subject_or_skill, "Japanese Conversation");
+  assert.equal(data.matches[0].weights.availability, 0.5);
+  assert.equal(data.matches[0].contributions.availability, 50);
 });
 test("database outage returns actionable 503 without raw database details", async () => {
   const response = await findMatches(

@@ -134,16 +134,6 @@ export async function findMatches(db: SupabaseClient, request: Request, now = ne
     if (own.error) throw own.error;
     if (!own.data) return reply({ error: "Goal not found." }, 404);
     const query = goal(own.data as DBGoal);
-    if (query.information_version === 2 && query.category === "skill_practice")
-      return reply(
-        {
-          error:
-            "Partner search is not available for this learning goal category yet. The goal is saved and ready for future matching support.",
-          code: "UNSUPPORTED_MATCHING_CATEGORY",
-          field_errors: [],
-        },
-        422
-      );
     validateGoal(query, now);
     let fetch = db
       .from("matching_goals")
@@ -151,10 +141,13 @@ export async function findMatches(db: SupabaseClient, request: Request, now = ne
       .eq("is_listed", true)
       .is("archived_at", null)
       .neq("user_id", id);
-    if (query.information_version === 2 && query.category === "exam_prep") {
+    if (
+      query.information_version === 2 &&
+      (query.category === "exam_prep" || query.category === "skill_practice")
+    ) {
       fetch = fetch
         .eq("information_version", 2)
-        .eq("category", "exam_prep")
+        .eq("category", query.category)
         .eq(
           "subject_or_skill_key",
           query.subject_or_skill!.trim().replace(/\s+/g, " ").toLowerCase()

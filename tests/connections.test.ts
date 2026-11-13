@@ -196,7 +196,7 @@ test("US-08 AC2: isEligibleCandidate uses assignment_id equality for assignment 
   assert.equal(isEligibleCandidate(assignOwn, assignCand), true);
   assert.equal(isEligibleCandidate(assignOwn, { ...assignCand, assignment_id: "HW-02" }), false);
 });
-test("US-07/US-08: an exact exam-subject match remains eligible for a connection request", () => {
+test("US-06/US-08: an exact exam-subject match remains eligible for a connection request", () => {
   const examOwn = {
     ...ownGoal,
     category: "exam_prep",
@@ -218,6 +218,34 @@ test("US-07/US-08: an exact exam-subject match remains eligible for a connection
   assert.equal(isEligibleCandidate(examOwn, examCandidate), true);
   assert.equal(
     isEligibleCandidate(examOwn, { ...examCandidate, subject_or_skill_key: "physics final" }),
+    false
+  );
+});
+test("US-07/US-08: an exact skill or language match remains eligible for a request", () => {
+  const practiceOwn = {
+    ...ownGoal,
+    category: "skill_practice",
+    subject_or_skill_key: "japanese conversation",
+    mode: null,
+    institution_key: null,
+    course_key: null,
+    topic_key: null,
+  };
+  const practiceCandidate = {
+    ...candidateGoal,
+    category: "skill_practice",
+    subject_or_skill_key: "japanese conversation",
+    mode: null,
+    institution_key: null,
+    course_key: null,
+    topic_key: null,
+  };
+  assert.equal(isEligibleCandidate(practiceOwn, practiceCandidate), true);
+  assert.equal(
+    isEligibleCandidate(practiceOwn, {
+      ...practiceCandidate,
+      subject_or_skill_key: "spanish conversation",
+    }),
     false
   );
 });

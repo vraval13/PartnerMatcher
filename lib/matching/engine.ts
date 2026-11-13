@@ -41,13 +41,14 @@ export type ScoringConfig = {
 };
 // Proposed urgency bands; team approval is still required. Weights follow Sprint 2.
 export const DEFAULT_CONFIG: ScoringConfig = {
-  version: "course-assignment-v1-proposed-urgency",
+  version: "category-aware-v2-proposed-urgency",
   urgency: [
     { within_days: 2, multiplier: 1.2 },
     { within_days: 7, multiplier: 1.1 },
   ],
 };
 export const WEIGHTS = { topic: 0.4, availability: 0.35, location: 0.25 };
+export const PRACTICE_WEIGHTS = { topic: 0.25, availability: 0.5, location: 0.25 };
 export class ValidationError extends Error {}
 export class TimezoneValidationError extends ValidationError {
   readonly code = "INVALID_TIMEZONE";
@@ -69,15 +70,16 @@ export function normalized(value: string | null | undefined) {
 }
 
 function hasCompatibleScope(query: GoalInput, candidate: GoalInput) {
-  if (query.information_version === 2 && query.category === "exam_prep") {
+  if (
+    query.information_version === 2 &&
+    (query.category === "exam_prep" || query.category === "skill_practice")
+  ) {
     return (
       candidate.information_version === 2 &&
-      candidate.category === "exam_prep" &&
+      candidate.category === query.category &&
       normalized(candidate.subject_or_skill) === normalized(query.subject_or_skill)
     );
   }
-
-  if (query.category === "skill_practice") return false;
 
   if (
     candidate.mode !== query.mode ||
@@ -324,7 +326,8 @@ export function rankCandidates(
       const overlap = duration(common);
       if (!overlap) return [];
       // Candidate eligibility already guarantees an exact course topic, assignment,
-      // or exam subject match. Keep the existing 40% component contract for US-04/05.
+      // exam subject, or practice skill/language match. US-07 gives recurring
+      // availability 50%; the remaining practice score preserves location at 25%.
       const topic = 100;
       const availability = Math.min(100, (100 * overlap) / duration(querySlots));
       const location =
@@ -337,10 +340,11 @@ export function rankCandidates(
               ? 100
               : 0;
       const components = { topic, availability: round(availability), location };
+      const weights = query.category === "skill_practice" ? PRACTICE_WEIGHTS : WEIGHTS;
       const contributions = {
-        topic: topic * WEIGHTS.topic,
-        availability: availability * WEIGHTS.availability,
-        location: location * WEIGHTS.location,
+        topic: topic * weights.topic,
+        availability: availability * weights.availability,
+        location: location * weights.location,
       };
       const base_score = round(Object.values(contributions).reduce((a, b) => a + b, 0));
       const days = candidate.due_date
@@ -369,7 +373,7 @@ export function rankCandidates(
           location_preference: candidate.location_preference,
           location: candidate.location,
           components,
-          weights: WEIGHTS,
+          weights,
           contributions: {
             ...contributions,
             availability: round(contributions.availability),

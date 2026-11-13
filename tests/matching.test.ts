@@ -92,7 +92,7 @@ test("US04: exclude unrelated topic/course, no overlap, self, private and archiv
   );
   assert.deepEqual(results, []);
 });
-test("US-07: exam preparation requires the same normalized exam subject", () => {
+test("US-06: exam preparation requires the same normalized exam subject", () => {
   const exam = goal({
     information_version: 2,
     category: "exam_prep",
@@ -134,6 +134,116 @@ test("US-07: exam preparation requires the same normalized exam subject", () => 
   );
   assert.equal(results[0].components.topic, 100);
   assert.equal(results[0].urgency_multiplier, 1);
+});
+test("US-07 AC1: practice partners use exact skill and 50% recurring availability weight", () => {
+  const practice = goal({
+    information_version: 2,
+    category: "skill_practice",
+    subject_or_skill: "  Japanese Conversation ",
+    proficiency_level: "beginner",
+    mode: null,
+    institution: null,
+    course_code: null,
+    topic: null,
+  });
+  const [result] = rankCandidates(
+    practice,
+    [
+      candidate({
+        ...practice,
+        id: "practice-match",
+        user_id: "other",
+        subject_or_skill: "japanese   conversation",
+        proficiency_level: "intermediate",
+      }),
+      candidate({
+        ...practice,
+        id: "wrong-skill",
+        user_id: "other-2",
+        subject_or_skill: "Spanish Conversation",
+      }),
+    ],
+    now
+  );
+  assert.equal(result.candidate_goal_id, "practice-match");
+  assert.deepEqual(result.weights, {
+    topic: 0.25,
+    availability: 0.5,
+    location: 0.25,
+  });
+  assert.equal(result.components.availability, 100);
+  assert.equal(result.contributions.availability, 50);
+});
+test("US-07 AC2: practice candidate with zero recurring overlap is excluded", () => {
+  const practice = goal({
+    information_version: 2,
+    category: "skill_practice",
+    subject_or_skill: "Japanese",
+    proficiency_level: "beginner",
+    mode: null,
+    institution: null,
+    course_code: null,
+    topic: null,
+  });
+  const results = rankCandidates(
+    practice,
+    [
+      candidate({
+        ...practice,
+        id: "no-overlap",
+        user_id: "other",
+        availability: [
+          {
+            weekday: 1,
+            start_time: "14:00",
+            end_time: "16:00",
+            timezone: "America/New_York",
+          },
+        ],
+      }),
+    ],
+    now
+  );
+  assert.deepEqual(results, []);
+});
+test("US-07 AC3: availability scores 100 and 60 contribute 50 and 30 points", () => {
+  const practice = goal({
+    information_version: 2,
+    category: "skill_practice",
+    subject_or_skill: "Japanese",
+    proficiency_level: "beginner",
+    mode: null,
+    institution: null,
+    course_code: null,
+    topic: null,
+  });
+  const results = rankCandidates(
+    practice,
+    [
+      candidate({ ...practice, id: "full", user_id: "other-full" }),
+      candidate({
+        ...practice,
+        id: "sixty",
+        user_id: "other-sixty",
+        availability: [
+          {
+            weekday: 0,
+            start_time: "14:00",
+            end_time: "15:12",
+            timezone: "America/New_York",
+          },
+        ],
+      }),
+    ],
+    now
+  );
+  const full = results.find((result) => result.candidate_goal_id === "full")!;
+  const sixty = results.find((result) => result.candidate_goal_id === "sixty")!;
+  assert.equal(full.components.availability, 100);
+  assert.equal(sixty.components.availability, 60);
+  assert.equal(full.contributions.availability, 50);
+  assert.equal(sixty.contributions.availability, 30);
+  assert.equal(full.base_score - sixty.base_score, 20);
 });
 test("US04: timezone conversion and partial overlap are measurable", () => {
   const results = rankCandidates(
