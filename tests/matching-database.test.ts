@@ -34,6 +34,9 @@ test("migration: actual Postgres constraints, transaction rollback and RLS permi
     await db.exec(
       `create role anon; create role authenticated; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; grant usage on schema auth,public to anon,authenticated; grant execute on function auth.uid() to anon,authenticated; insert into auth.users values('${alice}'),('${bob}'); create table public.profiles(user_id uuid primary key references auth.users(id),is_discoverable boolean not null default true); insert into public.profiles(user_id) values('${alice}'),('${bob}'); alter table public.profiles enable row level security; grant select,update on public.profiles to authenticated; create policy profiles_read on public.profiles for select to authenticated using(true); create policy profiles_update on public.profiles for update to authenticated using(user_id=(select auth.uid())) with check(user_id=(select auth.uid()));`
     );
+    await db.exec(
+      `create table public.connections(id uuid primary key default gen_random_uuid(),requester_id uuid not null references auth.users(id),receiver_id uuid not null references auth.users(id),status text not null); insert into public.connections(requester_id,receiver_id,status) values('${alice}','${bob}','pending'),('${alice}','${bob}','accepted'),('${alice}','${bob}','rejected'),('${alice}','${bob}','cancelled'); alter table public.connections enable row level security; grant select on public.connections to authenticated; create policy connections_read_participants on public.connections for select to authenticated using(requester_id=(select auth.uid()) or receiver_id=(select auth.uid()));`
+    );
     const legacyMigration = readdirSync("supabase/migrations").find((f) =>
       f.endsWith("_course_assignment_matching.sql")
     )!;
@@ -252,9 +255,27 @@ test("migration: actual Postgres constraints, transaction rollback and RLS permi
       "Paused owner is hidden from new peer discovery"
     );
     assert.equal(
+      (
+        await db.query<{ paused: boolean }>("select public.matching_goal_is_paused($1) as paused", [
+          own,
+        ])
+      ).rows[0].paused,
+      true,
+      "A signed-in peer with an old goal ID can receive the unavailable status"
+    );
+    assert.equal(
       (await db.query("select * from public.matching_availability")).rows.length,
       0,
       "Paused owner's slots are hidden with the goal"
+    );
+    assert.deepEqual(
+      (
+        await db.query<{ status: string }>(
+          "select status from public.connections order by array_position(array['pending','accepted','rejected','cancelled'],status)"
+        )
+      ).rows.map((row) => row.status),
+      ["pending", "accepted", "rejected", "cancelled"],
+      "Pause retains pending, accepted, declined/rejected, and cancelled requests"
     );
     await db.exec(`set request.jwt.claim.sub='${alice}';`);
     assert.equal(

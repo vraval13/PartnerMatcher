@@ -141,6 +141,14 @@ async function getAuthUserId(db: SupabaseClient): Promise<string | null> {
   return !error && data.user ? data.user.id : null;
 }
 
+async function isPausedMatchingGoal(db: SupabaseClient, candidateGoalId: string) {
+  const { data, error } = await db.rpc("matching_goal_is_paused", {
+    candidate_goal_id: candidateGoalId,
+  });
+  if (error) throw error;
+  return data === true;
+}
+
 // ── eligibility ──────────────────────────────────────────────────────────────
 
 /**
@@ -239,6 +247,22 @@ export async function sendConnectionRequest(
 
     // AC2: candidate must pass the same eligibility filters as the matching engine
     if (!isEligibleCandidate(ownGoal as GoalRow, candidateGoal as GoalRow | null)) {
+      if (!candidateGoal && (await isPausedMatchingGoal(db, candidateGoalId))) {
+        return reply(
+          {
+            error:
+              "This student's matching profile is currently unavailable. A new connection request cannot be sent.",
+            code: "MATCHING_PAUSED",
+            field_errors: [
+              {
+                field: "candidate_goal_id",
+                message: "This student is currently unavailable for new connection requests.",
+              },
+            ],
+          },
+          409
+        );
+      }
       return reply(
         {
           error: "Candidate is not in your current results for this goal.",

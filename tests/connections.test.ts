@@ -102,7 +102,14 @@ function db(lookup: (url: URL, init?: RequestInit) => unknown, signedIn = true) 
 }
 
 /** Happy-path DB: requester's goal → own, candidate's goal → candidate, INSERT → connId. */
-function happyDb(overrides: { own?: unknown; candidate?: unknown; insertResult?: unknown } = {}) {
+function happyDb(
+  overrides: {
+    own?: unknown;
+    candidate?: unknown;
+    insertResult?: unknown;
+    candidatePaused?: boolean;
+  } = {}
+) {
   return db((url, init) => {
     // INSERT into connections — match by path to avoid catching auth POSTs
     if (init?.method === "POST" && url.pathname === "/rest/v1/connections") {
@@ -116,6 +123,11 @@ function happyDb(overrides: { own?: unknown; candidate?: unknown; insertResult?:
     if (url.pathname === "/rest/v1/matching_goals" && url.searchParams.has("is_listed")) {
       // candidate's goal lookup
       return overrides.candidate !== undefined ? overrides.candidate : candidateGoal;
+    }
+    if (url.pathname === "/rest/v1/rpc/matching_goal_is_paused") {
+      const body = JSON.parse(String(init?.body));
+      assert.equal(body.candidate_goal_id, candGoalId);
+      return overrides.candidatePaused ?? false;
     }
     return null; // safe default for unexpected SDK fetches (auth checks, etc.)
   });
@@ -361,6 +373,31 @@ test("US-08 AC2: candidate not found (not listed/archived) returns 422 — not i
   const res = await sendConnectionRequest(happyDb({ candidate: null }), request(validBody));
   assert.equal(res.status, 422);
   assert.equal((await res.json()).code, "CANDIDATE_NOT_IN_RESULTS");
+});
+
+test("US-16 AC3: an old result for a paused profile explains unavailability and blocks request", async () => {
+  let insertAttempted = false;
+  const client = db((url, init) => {
+    if (init?.method === "POST" && url.pathname === "/rest/v1/connections") {
+      insertAttempted = true;
+      return { id: connId };
+    }
+    if (url.pathname === "/rest/v1/matching_goals" && url.searchParams.has("user_id")) {
+      return ownGoal;
+    }
+    if (url.pathname === "/rest/v1/matching_goals" && url.searchParams.has("is_listed")) {
+      return null;
+    }
+    if (url.pathname === "/rest/v1/rpc/matching_goal_is_paused") return true;
+    return null;
+  });
+
+  const response = await sendConnectionRequest(client, request(validBody));
+  assert.equal(response.status, 409);
+  const body = await response.json();
+  assert.equal(body.code, "MATCHING_PAUSED");
+  assert.match(body.error, /currently unavailable/i);
+  assert.equal(insertAttempted, false);
 });
 
 test("US-08 AC2: candidate with different topic returns 422 — not in results", async () => {

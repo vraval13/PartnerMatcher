@@ -47,4 +47,31 @@ using (
   )
 );
 
+-- AC3: the normal goal policies intentionally hide paused profiles. This
+-- narrow helper lets the connection endpoint distinguish an old result whose
+-- owner is paused from a random, archived, private, or invalid goal ID without
+-- exposing profile data.
+create or replace function public.matching_goal_is_paused(candidate_goal_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(
+    (
+      select p.matching_paused
+      from public.matching_goals g
+      join public.profiles p on p.user_id = g.user_id
+      where g.id = candidate_goal_id
+        and g.archived_at is null
+      limit 1
+    ),
+    false
+  );
+$$;
+
+revoke all on function public.matching_goal_is_paused(uuid) from public, anon;
+grant execute on function public.matching_goal_is_paused(uuid) to authenticated;
+
 commit;
