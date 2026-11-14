@@ -24,6 +24,9 @@ export type GoalInput = {
   topic: string | null;
   assignment_id: string | null;
   due_date: string | null;
+  exam_date?: string | null;
+  prep_start?: string | null;
+  prep_end?: string | null;
   timezone: string;
   location_preference: LocationPreference;
   location: string;
@@ -89,6 +92,31 @@ function validDate(value: string) {
     return false;
   }
 }
+export function validatePrepWindow(raw: Record<string, unknown>) {
+  const { exam_date, prep_start, prep_end } = raw;
+  if (
+    typeof exam_date !== "string" ||
+    !validDate(exam_date) ||
+    typeof prep_start !== "string" ||
+    !validDate(prep_start) ||
+    typeof prep_end !== "string" ||
+    !validDate(prep_end)
+  ) {
+    throw new ValidationError(
+      "Enter a valid exam date, preparation start date, and preparation end date."
+    );
+  }
+  if (prep_start > prep_end || prep_end > exam_date) {
+    throw new ValidationError(
+      "Preparation must start on or before its end date and end on or before the exam date."
+    );
+  }
+  if (Temporal.PlainDate.from(exam_date).since(Temporal.PlainDate.from(prep_start)).days > 366) {
+    throw new ValidationError("Preparation must start within 366 days of the exam.");
+  }
+  return { exam_date, prep_start, prep_end };
+}
+
 export function validateGoal(raw: unknown, asOf = new Date()): GoalInput {
   if (!raw || typeof raw !== "object" || Array.isArray(raw))
     throw new ValidationError("A goal object is required.");
@@ -110,6 +138,7 @@ export function validateGoal(raw: unknown, asOf = new Date()): GoalInput {
     const availability = validateAvailability(v.availability);
     return {
       ...information,
+      ...(information.category === "exam_prep" ? validatePrepWindow(v) : {}),
       mode: null,
       display_name: text(v.display_name, "display name", 100),
       institution: null,
@@ -217,15 +246,21 @@ function deadline(goal: GoalInput): number {
     : Infinity;
 }
 function intervals(goal: GoalInput, start: number, end: number): Interval[] {
+  if (end <= start) return [];
   const out: Interval[] = [];
   for (const slot of goal.availability) {
     const first = Temporal.Instant.fromEpochMilliseconds(start)
       .toZonedDateTimeISO(slot.timezone)
       .toPlainDate();
-    // Fourteen-day horizon plus one local boundary date; DST resolved by IANA rules.
-    for (let i = 0; i <= 15; i++) {
-      const date = first.add({ days: i });
-      if (date.dayOfWeek - 1 !== slot.weekday) continue;
+    const last = Temporal.Instant.fromEpochMilliseconds(end - 1)
+      .toZonedDateTimeISO(slot.timezone)
+      .toPlainDate();
+    const firstOccurrence = first.add({ days: (slot.weekday - (first.dayOfWeek - 1) + 7) % 7 });
+    for (
+      let date = firstOccurrence;
+      Temporal.PlainDate.compare(date, last) <= 0;
+      date = date.add({ days: 7 })
+    ) {
       try {
         const a = date.toPlainDateTime(slot.start_time).toZonedDateTime(slot.timezone, {
           disambiguation: "reject",
@@ -277,27 +312,45 @@ export function rankCandidates(
     )
   )
     throw new ValidationError("Invalid scoring configuration.");
-  const start = asOf.getTime(),
-    horizon = start + 14 * 86400000;
+  const exam = query.category === "exam_prep";
+  if (query.category === "skill_practice") return [];
+  const start = exam
+    ? Math.max(
+        asOf.getTime(),
+        Temporal.PlainDate.from(query.prep_start!).toZonedDateTime(query.timezone).epochMilliseconds
+      )
+    : asOf.getTime();
+  const horizon = exam
+    ? Temporal.PlainDate.from(query.prep_end!).add({ days: 1 }).toZonedDateTime(query.timezone)
+        .epochMilliseconds
+    : start + 14 * 86400000;
   const querySlots = intervals(query, start, Math.min(horizon, deadline(query)));
   const ranked = candidates
     .flatMap((candidate) => {
-      if (
-        candidate.user_id === query.user_id ||
-        !candidate.is_listed ||
-        candidate.archived_at ||
-        candidate.mode !== query.mode ||
-        normalized(candidate.institution) !== normalized(query.institution) ||
-        normalized(candidate.course_code) !== normalized(query.course_code)
-      )
+      if (candidate.user_id === query.user_id || !candidate.is_listed || candidate.archived_at)
         return [];
-      // Eligibility always precedes scoring. Assignment IDs remain case-sensitive.
-      if (
-        query.mode === "assignment"
-          ? candidate.assignment_id !== query.assignment_id
-          : normalized(candidate.topic) !== normalized(query.topic)
-      )
-        return [];
+      if (exam) {
+        if (
+          candidate.category !== "exam_prep" ||
+          normalized(candidate.subject_or_skill ?? null) !==
+            normalized(query.subject_or_skill ?? null) ||
+          candidate.exam_date !== query.exam_date
+        )
+          return [];
+      } else {
+        if (
+          candidate.mode !== query.mode ||
+          normalized(candidate.institution) !== normalized(query.institution) ||
+          normalized(candidate.course_code) !== normalized(query.course_code)
+        )
+          return [];
+        if (
+          query.mode === "assignment"
+            ? candidate.assignment_id !== query.assignment_id
+            : normalized(candidate.topic) !== normalized(query.topic)
+        )
+          return [];
+      }
       try {
         validateGoal(candidate, asOf);
       } catch {
@@ -309,7 +362,7 @@ export function rankCandidates(
       );
       const overlap = duration(common);
       if (!overlap) return [];
-      const topic = normalized(candidate.topic) === normalized(query.topic) ? 100 : 0;
+      const topic = exam || normalized(candidate.topic) === normalized(query.topic) ? 100 : 0;
       const availability = Math.min(100, (100 * overlap) / duration(querySlots));
       const location =
         query.location_preference === "either" || candidate.location_preference === "either"
@@ -327,15 +380,16 @@ export function rankCandidates(
         location: location * WEIGHTS.location,
       };
       const base_score = round(Object.values(contributions).reduce((a, b) => a + b, 0));
-      const days = candidate.due_date
-        ? Temporal.PlainDate.from(candidate.due_date).since(
+      const dueDate = exam ? query.exam_date : candidate.due_date;
+      const days = dueDate
+        ? Temporal.PlainDate.from(dueDate).since(
             Temporal.Instant.from(asOf.toISOString())
-              .toZonedDateTimeISO(candidate.timezone)
+              .toZonedDateTimeISO(exam ? query.timezone : candidate.timezone)
               .toPlainDate()
           ).days
         : Infinity;
       const urgency_multiplier =
-        query.mode === "assignment"
+        exam || query.mode === "assignment"
           ? (config.urgency.find((b) => days <= b.within_days)?.multiplier ?? 1)
           : 1;
       return [
@@ -344,7 +398,8 @@ export function rankCandidates(
           candidate_goal_id: candidate.id,
           display_name: candidate.display_name,
           course_code: candidate.course_code,
-          topic: candidate.topic,
+          topic: exam ? (candidate.subject_or_skill ?? null) : candidate.topic,
+          exam_date: candidate.exam_date ?? null,
           assignment_id: candidate.assignment_id,
           due_date: candidate.due_date,
           location_preference: candidate.location_preference,

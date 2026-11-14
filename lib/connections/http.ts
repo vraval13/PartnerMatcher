@@ -7,6 +7,7 @@
  * app/api/v1/connections/route.ts wraps both.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { previewPartner } from "../matching/http";
 
 // ── constants ────────────────────────────────────────────────────────────────
 
@@ -14,14 +15,17 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Subset of matching_goals columns needed for eligibility checking. */
 const GOAL_FIELDS =
-  "id,user_id,mode,institution_key,course_key,topic_key,assignment_id,is_listed,archived_at";
+  "id,user_id,mode,institution_key,course_key,topic_key,assignment_id,is_listed,archived_at,category,exam_date,subject_or_skill_key";
 
 // ── types ────────────────────────────────────────────────────────────────────
 
 type GoalRow = {
   id: string;
   user_id: string;
-  mode: string;
+  mode: string | null;
+  category?: string | null;
+  exam_date?: string | null;
+  subject_or_skill_key?: string | null;
   institution_key: string;
   course_key: string;
   topic_key: string;
@@ -148,6 +152,16 @@ export function isEligibleCandidate(own: GoalRow, candidate: GoalRow | null): bo
   if (!candidate) return false;
   if (!candidate.is_listed || candidate.archived_at) return false;
   if (candidate.user_id === own.user_id) return false;
+  if (own.category === "exam_prep" || candidate.category === "exam_prep") {
+    return (
+      own.category === "exam_prep" &&
+      candidate.category === "exam_prep" &&
+      Boolean(own.exam_date) &&
+      own.exam_date === candidate.exam_date &&
+      Boolean(own.subject_or_skill_key) &&
+      own.subject_or_skill_key === candidate.subject_or_skill_key
+    );
+  }
   if (candidate.mode !== own.mode) return false;
   if (candidate.institution_key !== own.institution_key) return false;
   if (candidate.course_key !== own.course_key) return false;
@@ -224,6 +238,14 @@ export async function sendConnectionRequest(
       .is("archived_at", null)
       .maybeSingle();
     if (candErr) throw candErr;
+
+    if (
+      (ownGoal as GoalRow).category === "exam_prep" &&
+      isEligibleCandidate(ownGoal as GoalRow, candidateGoal as GoalRow | null)
+    ) {
+      const eligibility = await previewPartner(db, goalId, candidateGoalId);
+      if (!eligibility.ok) return eligibility;
+    }
 
     // AC2: candidate must pass the same eligibility filters as the matching engine
     if (!isEligibleCandidate(ownGoal as GoalRow, candidateGoal as GoalRow | null)) {

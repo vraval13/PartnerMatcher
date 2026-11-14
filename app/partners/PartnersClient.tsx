@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { Goal, GoalInput, rankCandidates, Slot } from "@/lib/matching/engine";
 import type {
   MatchingCategory,
@@ -14,6 +14,52 @@ const categoryLabels: Record<MatchingCategory, string> = {
   exam_prep: "Exam preparation",
   skill_practice: "Skill / language practice",
 };
+const examDateFields = [
+  ["exam_date", "Exam date"],
+  ["prep_start", "Preparation start"],
+  ["prep_end", "Preparation end"],
+] as const;
+
+type PartnerProfile = {
+  display_name: string;
+  subject_or_skill: string | null;
+  category: MatchingCategory;
+  learning_goal: string | null;
+  proficiency_level: ProficiencyLevel | null;
+  course_code: string | null;
+  exam_date: string | null;
+  overlapping_slots: Match["overlapping_slots"];
+};
+
+function ExamDates({
+  values,
+  onChange,
+}: {
+  values: Pick<GoalInput, "exam_date" | "prep_start" | "prep_end">;
+  onChange: (key: (typeof examDateFields)[number][0], value: string) => void;
+}) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-3">
+      {examDateFields.map(([key, label]) => (
+        <label key={key} className="block text-sm">
+          {label}
+          <input
+            type="text"
+            placeholder="YYYY-MM-DD"
+            pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}"
+            maxLength={10}
+            title="Enter the date in YYYY-MM-DD format."
+            required
+            className={inputClass}
+            value={values[key] ?? ""}
+            onChange={(event) => onChange(key, event.target.value)}
+          />
+        </label>
+      ))}
+    </div>
+  );
+}
+
 const blank: GoalInput = {
   information_version: 2,
   category: "course",
@@ -39,6 +85,18 @@ const blank: GoalInput = {
     },
   ],
 };
+const sessionTimePattern = "[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}";
+
+function parseSessionTime(value: string) {
+  if (!new RegExp(`^${sessionTimePattern}$`).test(value)) return null;
+  const isoLocal = value.replace(" ", "T");
+  const date = new Date(isoLocal);
+  if (!Number.isFinite(date.getTime())) return null;
+  // Reject rolled-over dates and local times that do not exist during a DST change.
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16) === isoLocal ? date : null;
+}
+
 const inputClass = "w-full rounded-lg border border-slate-500/40 bg-transparent px-3 py-2 mt-1";
 class ApiError extends Error {
   constructor(
@@ -68,6 +126,15 @@ export default function PartnersClient() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [examEdit, setExamEdit] = useState<Pick<
+    GoalInput,
+    "exam_date" | "prep_start" | "prep_end"
+  > | null>(null);
+  const [preview, setPreview] = useState<PartnerProfile | null>(null);
+  const [previewError, setPreviewError] = useState("");
+  const [profileMatch, setProfileMatch] = useState<Match | null>(null);
+  const profileDialog = useRef<HTMLDialogElement>(null);
+  const profileRequest = useRef<AbortController | null>(null);
   const [connectTarget, setConnectTarget] = useState<Match | null>(null);
   const [connectForm, setConnectForm] = useState({
     session_topic: "",
@@ -115,14 +182,23 @@ export default function PartnersClient() {
     try {
       const saved = await api("/api/v1/matching-goals", {
         method: "POST",
-        body: JSON.stringify(form),
+        body: JSON.stringify(
+          form.category === "exam_prep"
+            ? form
+            : {
+                ...form,
+                exam_date: null,
+                prep_start: null,
+                prep_end: null,
+              }
+        ),
       });
       const data = await api("/api/v1/matching-goals");
       setGoals(data.goals);
       setSelected(saved.id);
       setMatches(null);
       setMessage(
-        form.category === "course"
+        form.category !== "skill_practice"
           ? "Goal saved. Select Find partners to search."
           : "Matching information saved. Partner search for this category is planned for a later story."
       );
@@ -131,6 +207,57 @@ export default function PartnersClient() {
       setError(e instanceof Error ? e.message : "Unable to save.");
     } finally {
       setBusy(false);
+    }
+  }
+  async function saveExamDates(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      await api("/api/v1/matching-goals", {
+        method: "PATCH",
+        body: JSON.stringify({ goal_id: selected, ...examEdit }),
+      });
+      setGoals((current) =>
+        current.map((goal) => (goal.id === selected ? { ...goal, ...examEdit } : goal))
+      );
+      setMatches(null);
+      setExamEdit(null);
+      setMessage("Exam dates saved. Select Find partners to search again.");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Unable to update exam dates.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function openProfile(match: Match) {
+    profileRequest.current?.abort();
+    const controller = new AbortController();
+    profileRequest.current = controller;
+    setProfileMatch(match);
+    setPreview(null);
+    setPreviewError("");
+    profileDialog.current?.showModal();
+    try {
+      const data = await api(
+        `/api/v1/matching-goals/${match.candidate_goal_id}/preview?search_goal_id=${selected}`,
+        { signal: controller.signal }
+      );
+      if (!controller.signal.aborted) setPreview(data.profile);
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      setPreviewError(error instanceof Error ? error.message : "Unable to load profile.");
+      if (
+        error instanceof ApiError &&
+        error.message === "This profile is no longer available for matching."
+      ) {
+        setMatches(
+          (current) =>
+            current?.filter((item) => item.candidate_goal_id !== match.candidate_goal_id) ?? null
+        );
+        setMessage("");
+      }
     }
   }
   async function search() {
@@ -165,9 +292,20 @@ export default function PartnersClient() {
   async function sendRequest(e: FormEvent) {
     e.preventDefault();
     if (!connectTarget || !selected) return;
-    setConnectBusy(true);
+    const start = parseSessionTime(connectForm.proposed_start);
+    const end = parseSessionTime(connectForm.proposed_end);
     setConnectError("");
     setConnectFieldErrors([]);
+    if (!start || !end) {
+      const message = "Enter a valid date and time in YYYY-MM-DD HH:MM format.";
+      const fields: MatchingFieldError[] = [];
+      if (!start) fields.push({ field: "proposed_start", code: "INVALID_VALUE", message });
+      if (!end) fields.push({ field: "proposed_end", code: "INVALID_VALUE", message });
+      setConnectFieldErrors(fields);
+      return;
+    }
+
+    setConnectBusy(true);
     try {
       const result = await api("/api/v1/connections", {
         method: "POST",
@@ -175,8 +313,8 @@ export default function PartnersClient() {
           goal_id: selected,
           candidate_goal_id: connectTarget.candidate_goal_id,
           session_topic: connectForm.session_topic,
-          proposed_start: new Date(connectForm.proposed_start).toISOString(),
-          proposed_end: new Date(connectForm.proposed_end).toISOString(),
+          proposed_start: start.toISOString(),
+          proposed_end: end.toISOString(),
           message: connectForm.message || undefined,
         }),
       });
@@ -249,8 +387,7 @@ export default function PartnersClient() {
     return issue ? <span className="mt-1 block text-xs text-red-500">{issue.message}</span> : null;
   }
   const selectedGoal = goals.find((goal) => goal.id === selected);
-  const selectedSupportsSearch =
-    !selectedGoal || selectedGoal.information_version === 1 || selectedGoal.category === "course";
+  const selectedSupportsSearch = !selectedGoal || selectedGoal.category !== "skill_practice";
   return (
     <main
       className="min-h-screen px-5 py-8"
@@ -263,7 +400,7 @@ export default function PartnersClient() {
         <h1 className="mt-5 text-3xl font-bold">Find a study partner</h1>
         <p className="mt-2 text-sm opacity-75">
           Save course study, exam preparation, and skill or language practice matching information.
-          Partner search currently supports course topics and assignments only.
+          Partner search supports course topics, assignments, and exam preparation.
         </p>
         {error && (
           <p role="alert" className="mt-5 rounded-xl border border-red-400 bg-red-500/10 p-4">
@@ -306,6 +443,7 @@ export default function PartnersClient() {
                 </select>
                 {fieldError("category")}
               </label>
+              {form.category === "exam_prep" && <ExamDates values={form} onChange={change} />}
               {field("Display name", "display_name", 100)}
               {field("Subject or skill", "subject_or_skill", 120)}
               <label className="block text-sm">
@@ -517,6 +655,7 @@ export default function PartnersClient() {
                     disabled={busy}
                     onChange={(e) => {
                       setSelected(e.target.value);
+                      setExamEdit(null);
                       setMatches(null);
                       setMessage("");
                     }}
@@ -534,7 +673,12 @@ export default function PartnersClient() {
                 </label>
                 <div className="flex gap-3 mt-3">
                   <button
-                    disabled={!selected || busy || !selectedSupportsSearch}
+                    disabled={
+                      !selected ||
+                      busy ||
+                      !selectedSupportsSearch ||
+                      (selectedGoal?.category === "exam_prep" && !selectedGoal.exam_date)
+                    }
                     onClick={search}
                     className="rounded-xl bg-indigo-600 px-4 py-2 text-white disabled:opacity-50"
                   >
@@ -548,6 +692,53 @@ export default function PartnersClient() {
                     Remove goal
                   </button>
                 </div>
+                {selectedGoal?.category === "exam_prep" && (
+                  <div className="mt-4">
+                    <p className="text-sm">
+                      {selectedGoal.exam_date
+                        ? `Exam: ${selectedGoal.exam_date} · Preparation: ${selectedGoal.prep_start} to ${selectedGoal.prep_end}`
+                        : "Add exam and preparation dates before searching."}
+                    </p>
+                    {examEdit ? (
+                      <form className="mt-3 space-y-3" onSubmit={saveExamDates}>
+                        <ExamDates
+                          values={examEdit}
+                          onChange={(key, value) => setExamEdit({ ...examEdit, [key]: value })}
+                        />
+                        <button
+                          type="submit"
+                          disabled={busy}
+                          className="rounded-xl bg-indigo-600 px-4 py-2 text-white"
+                        >
+                          Save dates
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => setExamEdit(null)}
+                          className="ml-3 underline"
+                        >
+                          Cancel
+                        </button>
+                      </form>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        className="mt-2 text-sm underline"
+                        onClick={() =>
+                          setExamEdit({
+                            exam_date: selectedGoal.exam_date,
+                            prep_start: selectedGoal.prep_start,
+                            prep_end: selectedGoal.prep_end,
+                          })
+                        }
+                      >
+                        Edit exam dates
+                      </button>
+                    )}
+                  </div>
+                )}
                 {selectedGoal && !selectedSupportsSearch && (
                   <p className="mt-3 text-sm opacity-75">
                     Partner search for {categoryLabels[selectedGoal.category!]} is planned for a
@@ -558,8 +749,8 @@ export default function PartnersClient() {
             )}
             {selectedGoal && selectedSupportsSearch && (
               <p className="mt-4 text-xs opacity-70">
-                Weights: topic 40% · availability 35% · location 25%. Assignment urgency proposal:
-                ≤2 days ×1.2; ≤7 days ×1.1; otherwise ×1.0. Final scores may exceed 100.
+                Weights: topic 40% · availability 35% · location 25%. Deadline urgency proposal: ≤2
+                days ×1.2; ≤7 days ×1.1; otherwise ×1.0. Final scores may exceed 100.
               </p>
             )}
             {matches && matches.length > 0 && (
@@ -576,7 +767,9 @@ export default function PartnersClient() {
                     <strong>{m.final_score}</strong>
                   </div>
                   <p className="mt-1 text-sm">
-                    {m.course_code} · {m.topic}
+                    {m.course_code && `${m.course_code} · `}
+                    {m.topic}
+                    {m.exam_date && ` · Exam ${m.exam_date}`}
                     {m.assignment_id && ` · ${m.assignment_id}`}
                   </p>
                   <p className="mt-1 text-sm">
@@ -607,7 +800,14 @@ export default function PartnersClient() {
                   <p className="mt-2 text-xs opacity-60">
                     Times shown in your browser timezone. Scoring: {m.configuration_version}
                   </p>
-                  <div className="mt-4">
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      className="rounded-xl border border-slate-500/40 px-4 py-2 text-sm font-semibold"
+                      onClick={() => openProfile(m)}
+                    >
+                      View profile
+                    </button>
                     {(() => {
                       const sent = sentConnections[m.candidate_goal_id];
                       if (!sent) {
@@ -676,6 +876,78 @@ export default function PartnersClient() {
         </div>
       </div>
 
+      <dialog
+        ref={profileDialog}
+        onClose={() => profileRequest.current?.abort()}
+        aria-labelledby="partner-profile-title"
+        className="fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh w-full max-w-md overflow-y-auto border-l border-slate-500/30 p-6 backdrop:bg-black/40"
+        style={{ background: "var(--bg-page)", color: "var(--text-page)" }}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <h2 id="partner-profile-title" className="text-xl font-bold">
+            {preview?.display_name ?? "Partner profile"}
+          </h2>
+          <form method="dialog">
+            <button className="underline">Close</button>
+          </form>
+        </div>
+        {previewError && (
+          <p role="alert" className="mt-4">
+            {previewError}
+          </p>
+        )}
+        {!preview && !previewError && (
+          <p role="status" className="mt-4">
+            Loading profile…
+          </p>
+        )}
+        {preview && (
+          <>
+            <dl className="mt-5 space-y-4 text-sm">
+              <div>
+                <dt className="font-semibold">Subject or skill</dt>
+                <dd>{preview.subject_or_skill ?? "Not provided"}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold">Learning goal</dt>
+                <dd>
+                  {categoryLabels[preview.category]}
+                  {preview.course_code && ` · ${preview.course_code}`}
+                  {preview.learning_goal && ` · ${preview.learning_goal}`}
+                  {preview.exam_date && ` · Exam ${preview.exam_date}`}
+                </dd>
+              </div>
+              <div>
+                <dt className="font-semibold">Proficiency</dt>
+                <dd>{preview.proficiency_level ?? "Not provided"}</dd>
+              </div>
+            </dl>
+            <h3 className="mt-5 font-semibold">Shared availability</h3>
+            <p className="text-xs opacity-70">Times shown in your browser timezone.</p>
+            <ul className="mt-2 space-y-2 text-sm">
+              {preview.overlapping_slots.map(({ start, end }) => (
+                <li key={start}>
+                  {new Date(start).toLocaleString()} – {new Date(end).toLocaleString()}
+                </li>
+              ))}
+            </ul>
+            {profileMatch && !sentConnections[profileMatch.candidate_goal_id] && (
+              <button
+                type="button"
+                disabled={busy || connectBusy}
+                className="mt-5 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                onClick={() => {
+                  profileDialog.current?.close();
+                  openConnect(profileMatch);
+                }}
+              >
+                Send request
+              </button>
+            )}
+          </>
+        )}
+      </dialog>
+
       {connectTarget && (
         <div
           role="dialog"
@@ -703,7 +975,8 @@ export default function PartnersClient() {
               </button>
             </div>
             <p className="mt-1 text-sm opacity-70">
-              To: <strong>{connectTarget.display_name}</strong> · {connectTarget.course_code}
+              To: <strong>{connectTarget.display_name}</strong>
+              {connectTarget.course_code && ` · ${connectTarget.course_code}`}
             </p>
             {connectError && (
               <p
@@ -731,11 +1004,15 @@ export default function PartnersClient() {
                   </span>
                 )}
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block text-sm">
                   Session start
                   <input
-                    type="datetime-local"
+                    type="text"
+                    placeholder="YYYY-MM-DD HH:MM"
+                    pattern={sessionTimePattern}
+                    maxLength={16}
+                    title="Enter a date and 24-hour time in YYYY-MM-DD HH:MM format."
                     className={inputClass}
                     required
                     value={connectForm.proposed_start}
@@ -753,7 +1030,11 @@ export default function PartnersClient() {
                 <label className="block text-sm">
                   Session end
                   <input
-                    type="datetime-local"
+                    type="text"
+                    placeholder="YYYY-MM-DD HH:MM"
+                    pattern={sessionTimePattern}
+                    maxLength={16}
+                    title="Enter a date and 24-hour time in YYYY-MM-DD HH:MM format."
                     className={inputClass}
                     required
                     value={connectForm.proposed_end}
@@ -769,6 +1050,7 @@ export default function PartnersClient() {
                   )}
                 </label>
               </div>
+              <p className="text-xs opacity-70">Times use your browser’s time zone.</p>
               <label className="block text-sm">
                 Message <span className="opacity-50">(optional, max 500 chars)</span>
                 <textarea
