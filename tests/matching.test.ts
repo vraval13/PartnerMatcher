@@ -102,6 +102,9 @@ test("US-06: exam preparation requires the same normalized exam subject", () => 
     institution: null,
     course_code: null,
     topic: null,
+    prep_start: "2026-11-02",
+    prep_end: "2026-11-09",
+    exam_date: "2026-11-10",
   });
   const results = rankCandidates(
     exam,

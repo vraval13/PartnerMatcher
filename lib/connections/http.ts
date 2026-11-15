@@ -7,6 +7,7 @@
  * app/api/v1/connections/route.ts wraps both.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { previewPartner } from "../matching/http";
 
 // ── constants ────────────────────────────────────────────────────────────────
 
@@ -14,7 +15,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Subset of matching_goals columns needed for eligibility checking. */
 const GOAL_FIELDS =
-  "id,user_id,information_version,category,subject_or_skill_key,mode,institution_key,course_key,topic_key,assignment_id,is_listed,archived_at";
+  "id,user_id,information_version,category,subject_or_skill_key,exam_date,mode,institution_key,course_key,topic_key,assignment_id,is_listed,archived_at";
 
 // ── types ────────────────────────────────────────────────────────────────────
 
@@ -24,6 +25,7 @@ type GoalRow = {
   information_version: number;
   category: string | null;
   subject_or_skill_key: string | null;
+  exam_date?: string | null;
   mode: string | null;
   institution_key: string | null;
   course_key: string | null;
@@ -159,15 +161,26 @@ export function isEligibleCandidate(own: GoalRow, candidate: GoalRow | null): bo
   if (!candidate) return false;
   if (!candidate.is_listed || candidate.archived_at) return false;
   if (candidate.user_id === own.user_id) return false;
-  if (
-    own.information_version === 2 &&
-    (own.category === "exam_prep" || own.category === "skill_practice")
-  ) {
+  if (own.category === "exam_prep" || candidate.category === "exam_prep") {
     return (
+      own.information_version === 2 &&
       candidate.information_version === 2 &&
-      candidate.category === own.category &&
+      own.category === "exam_prep" &&
+      candidate.category === "exam_prep" &&
+      Boolean(own.exam_date) &&
+      own.exam_date === candidate.exam_date &&
       Boolean(own.subject_or_skill_key) &&
       candidate.subject_or_skill_key === own.subject_or_skill_key
+    );
+  }
+  if (own.category === "skill_practice" || candidate.category === "skill_practice") {
+    return (
+      own.information_version === 2 &&
+      candidate.information_version === 2 &&
+      own.category === "skill_practice" &&
+      candidate.category === "skill_practice" &&
+      Boolean(own.subject_or_skill_key) &&
+      own.subject_or_skill_key === candidate.subject_or_skill_key
     );
   }
   if (candidate.mode !== own.mode) return false;
@@ -246,6 +259,15 @@ export async function sendConnectionRequest(
       .is("archived_at", null)
       .maybeSingle();
     if (candErr) throw candErr;
+
+    if (
+      ((ownGoal as GoalRow).category === "exam_prep" ||
+        (ownGoal as GoalRow).category === "skill_practice") &&
+      isEligibleCandidate(ownGoal as GoalRow, candidateGoal as GoalRow | null)
+    ) {
+      const eligibility = await previewPartner(db, goalId, candidateGoalId);
+      if (!eligibility.ok) return eligibility;
+    }
 
     // AC2: candidate must pass the same eligibility filters as the matching engine
     if (!isEligibleCandidate(ownGoal as GoalRow, candidateGoal as GoalRow | null)) {

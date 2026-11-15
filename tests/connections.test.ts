@@ -33,6 +33,7 @@ const ownGoal = {
   information_version: 2,
   category: "course",
   subject_or_skill_key: "react hooks",
+  exam_date: null,
   mode: "course",
   institution_key: "nyu",
   course_key: "cs-gy 6233",
@@ -48,6 +49,7 @@ const candidateGoal = {
   information_version: 2,
   category: "course",
   subject_or_skill_key: "react hooks",
+  exam_date: null,
   mode: "course",
   institution_key: "nyu",
   course_key: "cs-gy 6233",
@@ -201,6 +203,7 @@ test("US-06/US-08: an exact exam-subject match remains eligible for a connection
     ...ownGoal,
     category: "exam_prep",
     subject_or_skill_key: "calculus final",
+    exam_date: "2026-12-15",
     mode: null,
     institution_key: null,
     course_key: null,
@@ -210,6 +213,7 @@ test("US-06/US-08: an exact exam-subject match remains eligible for a connection
     ...candidateGoal,
     category: "exam_prep",
     subject_or_skill_key: "calculus final",
+    exam_date: "2026-12-15",
     mode: null,
     institution_key: null,
     course_key: null,
@@ -220,6 +224,7 @@ test("US-06/US-08: an exact exam-subject match remains eligible for a connection
     isEligibleCandidate(examOwn, { ...examCandidate, subject_or_skill_key: "physics final" }),
     false
   );
+  assert.equal(isEligibleCandidate(examOwn, { ...examCandidate, exam_date: "2026-12-16" }), false);
 });
 test("US-07/US-08: an exact skill or language match remains eligible for a request", () => {
   const practiceOwn = {

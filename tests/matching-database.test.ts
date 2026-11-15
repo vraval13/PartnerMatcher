@@ -154,10 +154,45 @@ test("migration: actual Postgres constraints, transaction rollback and RLS permi
       "Course mode forbids assignment fields"
     );
     await assert.rejects(create({ ...payload, timezone: "No/SuchZone" }));
+    // Existing exam records may be repaired in place after the migration.
+    const examPayload = {
+      ...payload,
+      category: "exam_prep",
+      mode: null,
+      institution: null,
+      course_code: null,
+      topic: null,
+      assignment_id: null,
+      due_date: null,
+    };
+    const legacyExam = await create(examPayload);
+    await db.exec("reset role");
+    const examMigration = readdirSync("supabase/migrations").find((f) =>
+      f.endsWith("_us06_exam_preparation.sql")
+    )!;
+    await db.exec(readFileSync(`supabase/migrations/${examMigration}`, "utf8"));
+    await db.exec(`set role authenticated; set request.jwt.claim.sub='${alice}';`);
+    await assert.rejects(create(examPayload), /Exam and preparation dates are required/);
+    await assert.rejects(
+      create({
+        ...examPayload,
+        exam_date: "2099-11-05",
+        prep_start: "2099-11-04",
+        prep_end: "2099-11-06",
+      })
+    );
+    await db.query(
+      "update public.matching_goals set exam_date='2099-11-05',prep_start='2099-11-04',prep_end='2099-11-05' where id=$1",
+      [legacyExam]
+    );
+    await db.query("delete from public.matching_goals where id=$1", [legacyExam]);
     for (const category of ["exam_prep", "skill_practice"]) {
       const id = await create({
         ...payload,
         category,
+        ...(category === "exam_prep"
+          ? { exam_date: "2099-11-05", prep_start: "2099-11-04", prep_end: "2099-11-05" }
+          : {}),
         mode: null,
         institution: null,
         course_code: null,
