@@ -1,7 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createClient } from "@supabase/supabase-js";
-import { findMatches, saveGoal, archiveGoal, listGoals } from "../lib/matching/http";
+import {
+  findMatches,
+  saveGoal,
+  archiveGoal,
+  listGoals,
+  previewPartner,
+} from "../lib/matching/http";
 const id = "11111111-1111-4111-8111-111111111111";
 const goalId = "22222222-2222-4222-8222-222222222222";
 const now = new Date("2026-11-02T12:00:00Z");
@@ -224,6 +230,9 @@ test("US-01: exam and skill saves do not send fake course fields", async () => {
         ...stored,
         category,
         subject_or_skill: category === "exam_prep" ? "Calculus exam" : "Japanese",
+        ...(category === "exam_prep"
+          ? { exam_date: "2026-11-03", prep_start: "2026-11-02", prep_end: "2026-11-03" }
+          : {}),
         proficiency_level: "beginner",
         mode: null,
         institution: null,
@@ -294,7 +303,7 @@ test("timezone validation rejects fixed offsets before calling the RPC", async (
     ]);
   }
 });
-test("US-01: exam and skill goals return unsupported-category without course matching", async () => {
+test("US-01: legacy exam goals require dates and skill goals remain unsupported", async () => {
   for (const category of ["exam_prep", "skill_practice"]) {
     const response = await findMatches(
       db((url) => {
@@ -315,7 +324,10 @@ test("US-01: exam and skill goals return unsupported-category without course mat
       now
     );
     assert.equal(response.status, 422);
-    assert.equal((await response.json()).code, "UNSUPPORTED_MATCHING_CATEGORY");
+    assert.equal(
+      (await response.json()).code,
+      category === "exam_prep" ? "INVALID_GOAL" : "UNSUPPORTED_MATCHING_CATEGORY"
+    );
   }
 });
 test("database outage returns actionable 503 without raw database details", async () => {
@@ -328,4 +340,107 @@ test("database outage returns actionable 503 without raw database details", asyn
   );
   assert.equal(response.status, 503);
   assert.doesNotMatch(JSON.stringify(await response.json()), /private database detail/);
+});
+
+const exam = {
+  ...stored,
+  information_version: 2,
+  category: "exam_prep",
+  subject_or_skill: "Calculus",
+  proficiency_level: "intermediate",
+  mode: null,
+  institution: null,
+  course_code: null,
+  topic: null,
+  prep_start: "2026-11-23",
+  prep_end: "2026-11-23",
+  exam_date: "2026-11-24",
+};
+const peer = {
+  ...exam,
+  id: "33333333-3333-4333-8333-333333333333",
+  user_id: "44444444-4444-4444-8444-444444444444",
+  display_name: "Peer",
+  is_listed: true,
+  email: "private@example.com",
+};
+
+test("US-06 searches the saved window beyond 14 days and excludes wrong exams and zero overlap", async () => {
+  const response = await findMatches(
+    db((url) => {
+      if (url.searchParams.has("id")) return exam;
+      assert.equal(url.searchParams.get("category"), "eq.exam_prep");
+      assert.equal(url.searchParams.get("exam_date"), "eq.2026-11-24");
+      assert.equal(url.searchParams.get("subject_or_skill_key"), "eq.calculus");
+      return [
+        peer,
+        { ...peer, exam_date: "2026-11-25" },
+        { ...peer, subject_or_skill: "Physics" },
+        { ...peer, matching_availability: [{ ...peer.matching_availability[0], weekday: 1 }] },
+        {
+          ...peer,
+          matching_availability: [
+            { ...peer.matching_availability[0], start_time: "16:00:00", end_time: "17:00:00" },
+          ],
+        },
+      ].map((candidate, index) => ({ ...candidate, user_id: `candidate-${index}` }));
+    }),
+    request({ goal_id: goalId }),
+    now
+  );
+  assert.equal(response.status, 200);
+  const { matches } = await response.json();
+  assert.equal(matches.length, 1);
+  assert.equal(matches[0].overlap_minutes, 120);
+  assert.equal(matches[0].final_score, 100);
+  assert.equal(matches[0].overlapping_slots[0].start, "2026-11-23T14:00:00.000Z");
+});
+
+test("US-06 invalid window fails before fetching candidates", async () => {
+  for (const invalid of [{ prep_start: "2026-11-24" }, { prep_end: "2026-11-25" }]) {
+    let lookups = 0;
+    const response = await findMatches(
+      db(() => {
+        lookups++;
+        return { ...exam, ...invalid };
+      }),
+      request({ goal_id: goalId }),
+      now
+    );
+    assert.equal(response.status, 422);
+    assert.equal(lookups, 1);
+    assert.match((await response.json()).error, /on or before/);
+  }
+});
+
+test("US-15 previews only matching information and rejects stale or foreign goals", async () => {
+  const client = (candidate: unknown, owned: unknown = exam) =>
+    db((url) => {
+      if (url.searchParams.get("id") === `eq.${goalId}`) {
+        assert.equal(url.searchParams.get("user_id"), `eq.${id}`);
+        return owned;
+      }
+      return candidate;
+    });
+  const response = await previewPartner(client(peer), goalId, peer.id, now);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    profile: {
+      display_name: "Peer",
+      subject_or_skill: "Calculus",
+      category: "exam_prep",
+      learning_goal: "Calculus",
+      proficiency_level: "intermediate",
+      course_code: null,
+      exam_date: "2026-11-24",
+      overlapping_slots: [{ start: "2026-11-23T14:00:00.000Z", end: "2026-11-23T16:00:00.000Z" }],
+    },
+  });
+  for (const dbClient of [
+    client({ ...peer, is_listed: false }),
+    client(null),
+    client(peer, null),
+  ]) {
+    assert.equal((await previewPartner(dbClient, goalId, peer.id, now)).status, 404);
+  }
 });

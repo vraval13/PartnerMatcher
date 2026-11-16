@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   rankCandidates,
+  normalized,
+  validatePrepWindow,
   TimezoneValidationError,
   validateGoal,
   ValidationError,
@@ -9,11 +11,11 @@ import {
 } from "./engine";
 import { MatchingInformationError } from "./information";
 
-type DBGoal = Omit<Goal, "availability"> & { matching_availability: Slot[] };
-const selection =
-  "id,user_id,information_version,category,subject_or_skill,proficiency_level,mode,display_name,institution,course_code,topic,assignment_id,due_date,timezone,location_preference,location,is_listed,archived_at,matching_availability(weekday,start_time,end_time,timezone)";
+export type DBGoal = Omit<Goal, "availability"> & { matching_availability: Slot[] };
+export const matchingGoalSelection =
+  "id,user_id,information_version,category,subject_or_skill,proficiency_level,exam_date,prep_start,prep_end,mode,display_name,institution,course_code,topic,assignment_id,due_date,timezone,location_preference,location,is_listed,archived_at,matching_availability(weekday,start_time,end_time,timezone)";
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-function goal(row: DBGoal): Goal {
+export function goal(row: DBGoal): Goal {
   const { matching_availability, ...fields } = row;
   return {
     ...fields,
@@ -52,7 +54,7 @@ function failure(error: unknown): Response {
   return reply(
     {
       error:
-        "Matching storage is unavailable. Ask your team administrator to apply the US04/US05 database migration, then retry.",
+        "Matching storage is unavailable. Ask your team administrator to apply the matching database migrations, then retry.",
     },
     503
   );
@@ -67,7 +69,7 @@ export async function listGoals(db: SupabaseClient) {
     if (!id) return reply({ error: "Sign in to manage matching goals." }, 401);
     const { data, error } = await db
       .from("matching_goals")
-      .select(selection)
+      .select(matchingGoalSelection)
       .eq("user_id", id)
       .is("archived_at", null)
       .order("created_at", { ascending: false });
@@ -126,7 +128,7 @@ export async function findMatches(db: SupabaseClient, request: Request, now = ne
     // Explicit ownership filter even though listed candidate goals are readable under RLS.
     const own = await db
       .from("matching_goals")
-      .select(selection)
+      .select(matchingGoalSelection)
       .eq("id", body.goal_id)
       .eq("user_id", id)
       .is("archived_at", null)
@@ -134,7 +136,7 @@ export async function findMatches(db: SupabaseClient, request: Request, now = ne
     if (own.error) throw own.error;
     if (!own.data) return reply({ error: "Goal not found." }, 404);
     const query = goal(own.data as DBGoal);
-    if (query.information_version === 2 && query.category !== "course")
+    if (query.category === "skill_practice")
       return reply(
         {
           error:
@@ -145,19 +147,26 @@ export async function findMatches(db: SupabaseClient, request: Request, now = ne
         422
       );
     validateGoal(query, now);
-    let fetch = db
+    const candidates = db
       .from("matching_goals")
-      .select(selection)
+      .select(matchingGoalSelection)
       .eq("is_listed", true)
       .is("archived_at", null)
-      .neq("user_id", id)
-      .eq("mode", query.mode)
-      .eq("institution_key", query.institution!.trim().replace(/\s+/g, " ").toLowerCase())
-      .eq("course_key", query.course_code!.trim().replace(/\s+/g, " ").toLowerCase());
-    fetch =
-      query.mode === "assignment"
-        ? fetch.eq("assignment_id", query.assignment_id!)
-        : fetch.eq("topic_key", query.topic!.trim().replace(/\s+/g, " ").toLowerCase());
+      .neq("user_id", id);
+    const exam = query.category === "exam_prep";
+    const fetch = exam
+      ? candidates
+          .eq("category", "exam_prep")
+          .eq("exam_date", query.exam_date!)
+          .eq("subject_or_skill_key", normalized(query.subject_or_skill ?? null))
+      : candidates
+          .eq("mode", query.mode!)
+          .eq("institution_key", normalized(query.institution))
+          .eq("course_key", normalized(query.course_code))
+          .eq(
+            query.mode === "assignment" ? "assignment_id" : "topic_key",
+            query.mode === "assignment" ? query.assignment_id! : normalized(query.topic)
+          );
     // Fetch one over the supported cap; never silently rank an incomplete candidate set.
     const { data, error } = await fetch.order("id").limit(1000);
     if (error) throw error;
@@ -176,9 +185,88 @@ export async function findMatches(db: SupabaseClient, request: Request, now = ne
         ? `${matches.length} suitable match(es) found.`
         : "No suitable match was found.",
       as_of: now.toISOString(),
-      search_horizon_days: 14,
+      search_horizon_days: exam ? null : 14,
     });
   } catch (error) {
     return failure(error);
+  }
+}
+
+export async function updateExamDates(db: SupabaseClient, request: Request) {
+  try {
+    const id = await userId(db);
+    if (!id) return reply({ error: "Sign in to update your goal." }, 401);
+    const body = await request.json();
+    if (!body || !uuid.test(body.goal_id ?? ""))
+      throw new ValidationError("A valid goal_id is required.");
+    const dates = validatePrepWindow(body);
+    const { data, error } = await db
+      .from("matching_goals")
+      .update(dates)
+      .eq("id", body.goal_id)
+      .eq("user_id", id)
+      .eq("category", "exam_prep")
+      .is("archived_at", null)
+      .select("id")
+      .maybeSingle();
+    if (error) throw error;
+    return data ? reply({ id: data.id }) : reply({ error: "Exam goal not found." }, 404);
+  } catch (error) {
+    return failure(error);
+  }
+}
+
+export async function previewPartner(
+  db: SupabaseClient,
+  searchGoalId: string,
+  candidateGoalId: string,
+  now = new Date()
+) {
+  const unavailable = () =>
+    reply(
+      { error: "This profile is no longer available for matching.", code: "PROFILE_UNAVAILABLE" },
+      404
+    );
+  try {
+    const id = await userId(db);
+    if (!id) return reply({ error: "Sign in to view partner profiles." }, 401);
+    if (!uuid.test(searchGoalId) || !uuid.test(candidateGoalId)) return unavailable();
+    const own = await db
+      .from("matching_goals")
+      .select(matchingGoalSelection)
+      .eq("id", searchGoalId)
+      .eq("user_id", id)
+      .is("archived_at", null)
+      .maybeSingle();
+    if (own.error) throw own.error;
+    if (!own.data) return unavailable();
+    const other = await db
+      .from("matching_goals")
+      .select(matchingGoalSelection)
+      .eq("id", candidateGoalId)
+      .eq("is_listed", true)
+      .is("archived_at", null)
+      .maybeSingle();
+    if (other.error) throw other.error;
+    if (!other.data) return unavailable();
+    const candidate = goal(other.data as DBGoal);
+    const [match] = rankCandidates(goal(own.data as DBGoal), [candidate], now);
+    if (!match) return unavailable();
+    return reply({
+      profile: {
+        display_name: candidate.display_name,
+        subject_or_skill: candidate.subject_or_skill ?? candidate.topic,
+        category: candidate.category ?? "course",
+        learning_goal: candidate.assignment_id ?? candidate.topic ?? candidate.subject_or_skill,
+        proficiency_level: candidate.proficiency_level,
+        course_code: candidate.course_code,
+        exam_date: candidate.exam_date ?? null,
+        overlapping_slots: match.overlapping_slots,
+      },
+    });
+  } catch (error) {
+    return error instanceof ValidationError || error instanceof MatchingInformationError
+      ? unavailable()
+      : failure(error);
   }
 }
