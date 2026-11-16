@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import type { Goal, GoalInput, rankCandidates, Slot } from "@/lib/matching/engine";
 import type {
   MatchingCategory,
@@ -19,17 +19,6 @@ const examDateFields = [
   ["prep_start", "Preparation start"],
   ["prep_end", "Preparation end"],
 ] as const;
-
-type PartnerProfile = {
-  display_name: string;
-  subject_or_skill: string | null;
-  category: MatchingCategory;
-  learning_goal: string | null;
-  proficiency_level: ProficiencyLevel | null;
-  course_code: string | null;
-  exam_date: string | null;
-  overlapping_slots: Match["overlapping_slots"];
-};
 
 function ExamDates({
   values,
@@ -132,11 +121,6 @@ export default function PartnersClient() {
     GoalInput,
     "exam_date" | "prep_start" | "prep_end"
   > | null>(null);
-  const [preview, setPreview] = useState<PartnerProfile | null>(null);
-  const [previewError, setPreviewError] = useState("");
-  const [profileMatch, setProfileMatch] = useState<Match | null>(null);
-  const profileDialog = useRef<HTMLDialogElement>(null);
-  const profileRequest = useRef<AbortController | null>(null);
   const [connectTarget, setConnectTarget] = useState<Match | null>(null);
   const [connectForm, setConnectForm] = useState({
     session_topic: "",
@@ -150,6 +134,9 @@ export default function PartnersClient() {
   const [sentConnections, setSentConnections] = useState<
     Record<string, { id: string; status: string }>
   >({});
+  const [favoriteGoalIds, setFavoriteGoalIds] = useState<string[]>([]);
+  const [favoriteBusy, setFavoriteBusy] = useState<string | null>(null);
+  const [favoriteMessages, setFavoriteMessages] = useState<Record<string, string>>({});
   useEffect(() => {
     let live = true;
     Promise.all([api("/api/v1/matching-goals"), api("/api/v1/matching-status")])
@@ -190,6 +177,27 @@ export default function PartnersClient() {
       setPauseBusy(false);
     }
   }
+  useEffect(() => {
+    let live = true;
+
+    api("/api/v1/favorites")
+      .then((data) => {
+        if (live) {
+          setFavoriteGoalIds(
+            data.favorites.flatMap(
+              (favorite: { candidate_goal_ids: string[] }) => favorite.candidate_goal_ids
+            )
+          );
+        }
+      })
+      .catch((e) => {
+        if (live) setError(e.message);
+      });
+
+    return () => {
+      live = false;
+    };
+  }, []);
   function change<K extends keyof GoalInput>(key: K, value: GoalInput[K]) {
     setForm((f) => ({ ...f, [key]: value }));
   }
@@ -253,35 +261,6 @@ export default function PartnersClient() {
       setBusy(false);
     }
   }
-  async function openProfile(match: Match) {
-    profileRequest.current?.abort();
-    const controller = new AbortController();
-    profileRequest.current = controller;
-    setProfileMatch(match);
-    setPreview(null);
-    setPreviewError("");
-    profileDialog.current?.showModal();
-    try {
-      const data = await api(
-        `/api/v1/matching-goals/${match.candidate_goal_id}/preview?search_goal_id=${selected}`,
-        { signal: controller.signal }
-      );
-      if (!controller.signal.aborted) setPreview(data.profile);
-    } catch (error) {
-      if (controller.signal.aborted) return;
-      setPreviewError(error instanceof Error ? error.message : "Unable to load profile.");
-      if (
-        error instanceof ApiError &&
-        error.message === "This profile is no longer available for matching."
-      ) {
-        setMatches(
-          (current) =>
-            current?.filter((item) => item.candidate_goal_id !== match.candidate_goal_id) ?? null
-        );
-        setMessage("");
-      }
-    }
-  }
   async function search() {
     setBusy(true);
     setError("");
@@ -300,6 +279,45 @@ export default function PartnersClient() {
       setBusy(false);
     }
   }
+  async function toggleFavorite(m: Match) {
+    const goalId = m.candidate_goal_id;
+    const isFavorite = favoriteGoalIds.includes(goalId);
+
+    if (isFavorite && !window.confirm(`Remove ${m.display_name} from your favorites?`)) {
+      return;
+    }
+
+    setFavoriteBusy(goalId);
+    setFavoriteMessages((prev) => ({ ...prev, [goalId]: "" }));
+
+    try {
+      const result = await api("/api/v1/favorites", {
+        method: isFavorite ? "DELETE" : "POST",
+        body: JSON.stringify({ candidate_goal_id: goalId }),
+      });
+
+      setFavoriteGoalIds((prev) => {
+        if (isFavorite) {
+          return prev.filter((id) => id !== goalId);
+        }
+        return prev.includes(goalId) ? prev : [...prev, goalId];
+      });
+
+      setFavoriteMessages((prev) => ({
+        ...prev,
+        [goalId]:
+          result.message ?? (isFavorite ? "Removed from favorites." : "Added to favorites."),
+      }));
+    } catch (e) {
+      setFavoriteMessages((prev) => ({
+        ...prev,
+        [goalId]: e instanceof Error ? e.message : "Unable to update favorites.",
+      }));
+    } finally {
+      setFavoriteBusy(null);
+    }
+  }
+
   function openConnect(m: Match) {
     setConnectForm({
       session_topic: m.topic ?? m.subject_or_skill ?? "",
@@ -868,14 +886,32 @@ export default function PartnersClient() {
                   <p className="mt-2 text-xs opacity-60">
                     Times shown in your browser timezone. Scoring: {m.configuration_version}
                   </p>
-                  <div className="mt-4 flex flex-wrap items-center gap-3">
-                    <button
-                      type="button"
-                      className="rounded-xl border border-slate-500/40 px-4 py-2 text-sm font-semibold"
-                      onClick={() => openProfile(m)}
+                  <div className="mt-4">
+                    <a
+                      href={`/partners/profile/${m.candidate_goal_id}`}
+                      className="mb-3 mr-3 inline-block rounded-xl border border-slate-500/40 px-4 py-2 text-sm font-semibold"
                     >
                       View profile
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => toggleFavorite(m)}
+                      disabled={favoriteBusy === m.candidate_goal_id}
+                      className="mb-3 rounded-xl border border-slate-500/40 px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                    >
+                      {favoriteBusy === m.candidate_goal_id
+                        ? "Please wait…"
+                        : favoriteGoalIds.includes(m.candidate_goal_id)
+                          ? "Remove from favorites"
+                          : "Add to favorites"}
                     </button>
+
+                    {favoriteMessages[m.candidate_goal_id] && (
+                      <p role="status" className="mb-3 text-sm opacity-80">
+                        {favoriteMessages[m.candidate_goal_id]}
+                      </p>
+                    )}
+
                     {(() => {
                       const sent = sentConnections[m.candidate_goal_id];
                       if (!sent) {
@@ -943,78 +979,6 @@ export default function PartnersClient() {
           </section>
         </div>
       </div>
-
-      <dialog
-        ref={profileDialog}
-        onClose={() => profileRequest.current?.abort()}
-        aria-labelledby="partner-profile-title"
-        className="fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh w-full max-w-md overflow-y-auto border-l border-slate-500/30 p-6 backdrop:bg-black/40"
-        style={{ background: "var(--bg-page)", color: "var(--text-page)" }}
-      >
-        <div className="flex items-start justify-between gap-4">
-          <h2 id="partner-profile-title" className="text-xl font-bold">
-            {preview?.display_name ?? "Partner profile"}
-          </h2>
-          <form method="dialog">
-            <button className="underline">Close</button>
-          </form>
-        </div>
-        {previewError && (
-          <p role="alert" className="mt-4">
-            {previewError}
-          </p>
-        )}
-        {!preview && !previewError && (
-          <p role="status" className="mt-4">
-            Loading profile…
-          </p>
-        )}
-        {preview && (
-          <>
-            <dl className="mt-5 space-y-4 text-sm">
-              <div>
-                <dt className="font-semibold">Subject or skill</dt>
-                <dd>{preview.subject_or_skill ?? "Not provided"}</dd>
-              </div>
-              <div>
-                <dt className="font-semibold">Learning goal</dt>
-                <dd>
-                  {categoryLabels[preview.category]}
-                  {preview.course_code && ` · ${preview.course_code}`}
-                  {preview.learning_goal && ` · ${preview.learning_goal}`}
-                  {preview.exam_date && ` · Exam ${preview.exam_date}`}
-                </dd>
-              </div>
-              <div>
-                <dt className="font-semibold">Proficiency</dt>
-                <dd>{preview.proficiency_level ?? "Not provided"}</dd>
-              </div>
-            </dl>
-            <h3 className="mt-5 font-semibold">Shared availability</h3>
-            <p className="text-xs opacity-70">Times shown in your browser timezone.</p>
-            <ul className="mt-2 space-y-2 text-sm">
-              {preview.overlapping_slots.map(({ start, end }) => (
-                <li key={start}>
-                  {new Date(start).toLocaleString()} – {new Date(end).toLocaleString()}
-                </li>
-              ))}
-            </ul>
-            {profileMatch && !sentConnections[profileMatch.candidate_goal_id] && (
-              <button
-                type="button"
-                disabled={busy || connectBusy}
-                className="mt-5 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                onClick={() => {
-                  profileDialog.current?.close();
-                  openConnect(profileMatch);
-                }}
-              >
-                Send request
-              </button>
-            )}
-          </>
-        )}
-      </dialog>
 
       {connectTarget && (
         <div
