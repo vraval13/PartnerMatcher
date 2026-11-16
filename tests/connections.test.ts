@@ -128,6 +128,7 @@ function happyDb(
     }
     if (url.pathname === "/rest/v1/rpc/matching_goal_is_paused") {
       const body = JSON.parse(String(init?.body));
+      assert.equal(body.search_goal_id, goalId);
       assert.equal(body.candidate_goal_id, candGoalId);
       return overrides.candidatePaused ?? false;
     }
@@ -421,7 +422,11 @@ test("US-16 AC3: an old result for a paused profile explains unavailability and 
     if (url.pathname === "/rest/v1/matching_goals" && url.searchParams.has("is_listed")) {
       return null;
     }
-    if (url.pathname === "/rest/v1/rpc/matching_goal_is_paused") return true;
+    if (url.pathname === "/rest/v1/rpc/matching_goal_is_paused") {
+      const body = JSON.parse(String(init?.body));
+      assert.deepEqual(body, { search_goal_id: goalId, candidate_goal_id: candGoalId });
+      return true;
+    }
     return null;
   });
 

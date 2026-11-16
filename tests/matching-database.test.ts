@@ -46,6 +46,9 @@ test("migration: actual Postgres constraints, transaction rollback and RLS permi
     const examPauseMigration = readdirSync("supabase/migrations").find((f) =>
       f.endsWith("_us07_us16_exam_pause.sql")
     )!;
+    const pauseAuthorizationMigration = readdirSync("supabase/migrations").find((f) =>
+      f.endsWith("_us16_pause_authorization.sql")
+    )!;
     await db.exec(readFileSync(`supabase/migrations/${legacyMigration}`, "utf8"));
     await db.exec(`set role authenticated; set request.jwt.claim.sub='${alice}';`);
     const create = async (p: unknown) => {
@@ -171,6 +174,7 @@ test("migration: actual Postgres constraints, transaction rollback and RLS permi
       f.endsWith("_us06_exam_preparation.sql")
     )!;
     await db.exec(readFileSync(`supabase/migrations/${examMigration}`, "utf8"));
+    await db.exec(readFileSync(`supabase/migrations/${pauseAuthorizationMigration}`, "utf8"));
     await db.exec(`set role authenticated; set request.jwt.claim.sub='${alice}';`);
     await assert.rejects(create(examPayload), /Exam and preparation dates are required/);
     await assert.rejects(
@@ -231,12 +235,33 @@ test("migration: actual Postgres constraints, transaction rollback and RLS permi
       "Database constraints reject unsupported values"
     );
     await db.exec(`set request.jwt.claim.sub='${bob}';`);
+    const bobSearch = await create({ ...payload, display_name: "Bob" });
     assert.equal(
-      (await db.query("select * from public.matching_goals")).rows.length,
+      (await db.query("select * from public.matching_goals where id=$1", [own])).rows.length,
       0,
       "Private goal invisible"
     );
-    assert.equal((await db.query("select * from public.matching_availability")).rows.length, 0);
+    assert.equal(
+      (await db.query("select * from public.matching_availability where goal_id=$1", [own])).rows
+        .length,
+      0
+    );
+    await db.exec(`set request.jwt.claim.sub='${alice}';`);
+    await db.query("update public.profiles set matching_paused=true where user_id=$1", [alice]);
+    await db.exec(`set request.jwt.claim.sub='${bob}';`);
+    assert.equal(
+      (
+        await db.query<{ paused: boolean }>(
+          "select public.matching_goal_is_paused($1,$2) as paused",
+          [bobSearch, own]
+        )
+      ).rows[0].paused,
+      false,
+      "A private goal never reveals its owner's pause status"
+    );
+    await db.exec(`set request.jwt.claim.sub='${alice}';`);
+    await db.query("update public.profiles set matching_paused=false where user_id=$1", [alice]);
+    await db.exec(`set request.jwt.claim.sub='${bob}';`);
     assert.equal(
       (
         await db.query("update public.matching_goals set is_listed=true where id=$1 returning id", [
@@ -276,30 +301,36 @@ test("migration: actual Postgres constraints, transaction rollback and RLS permi
     );
     await db.exec(`set request.jwt.claim.sub='${bob}';`);
     assert.equal(
-      (await db.query("select * from public.matching_goals")).rows.length,
+      (await db.query("select * from public.matching_goals where id=$1", [own])).rows.length,
       1,
       "Listed goal readable by signed-in peer"
     );
-    assert.equal((await db.query("select * from public.matching_availability")).rows.length, 1);
+    assert.equal(
+      (await db.query("select * from public.matching_availability where goal_id=$1", [own])).rows
+        .length,
+      1
+    );
     await db.exec(`set request.jwt.claim.sub='${alice}';`);
     await db.query("update public.profiles set matching_paused=true where user_id=$1", [alice]);
     await db.exec(`set request.jwt.claim.sub='${bob}';`);
     assert.equal(
-      (await db.query("select * from public.matching_goals")).rows.length,
+      (await db.query("select * from public.matching_goals where id=$1", [own])).rows.length,
       0,
       "Paused owner is hidden from new peer discovery"
     );
     assert.equal(
       (
-        await db.query<{ paused: boolean }>("select public.matching_goal_is_paused($1) as paused", [
-          own,
-        ])
+        await db.query<{ paused: boolean }>(
+          "select public.matching_goal_is_paused($1,$2) as paused",
+          [bobSearch, own]
+        )
       ).rows[0].paused,
       true,
-      "A signed-in peer with an old goal ID can receive the unavailable status"
+      "A caller with an eligible older match can receive the unavailable status"
     );
     assert.equal(
-      (await db.query("select * from public.matching_availability")).rows.length,
+      (await db.query("select * from public.matching_availability where goal_id=$1", [own])).rows
+        .length,
       0,
       "Paused owner's slots are hidden with the goal"
     );
@@ -321,7 +352,7 @@ test("migration: actual Postgres constraints, transaction rollback and RLS permi
     await db.query("update public.profiles set matching_paused=false where user_id=$1", [alice]);
     await db.exec(`set request.jwt.claim.sub='${bob}';`);
     assert.equal(
-      (await db.query("select * from public.matching_goals")).rows.length,
+      (await db.query("select * from public.matching_goals where id=$1", [own])).rows.length,
       1,
       "Resuming restores listed-goal discovery"
     );
@@ -337,7 +368,7 @@ test("migration: actual Postgres constraints, transaction rollback and RLS permi
     );
     await db.exec(`set request.jwt.claim.sub='${bob}';`);
     assert.equal(
-      (await db.query("select * from public.matching_goals")).rows.length,
+      (await db.query("select * from public.matching_goals where id=$1", [own])).rows.length,
       0,
       "Archived goal hidden"
     );

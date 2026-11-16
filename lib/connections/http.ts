@@ -143,8 +143,13 @@ async function getAuthUserId(db: SupabaseClient): Promise<string | null> {
   return !error && data.user ? data.user.id : null;
 }
 
-async function isPausedMatchingGoal(db: SupabaseClient, candidateGoalId: string) {
+async function isPausedMatchingGoal(
+  db: SupabaseClient,
+  searchGoalId: string,
+  candidateGoalId: string
+) {
   const { data, error } = await db.rpc("matching_goal_is_paused", {
+    search_goal_id: searchGoalId,
     candidate_goal_id: candidateGoalId,
   });
   if (error) throw error;
@@ -271,7 +276,7 @@ export async function sendConnectionRequest(
 
     // AC2: candidate must pass the same eligibility filters as the matching engine
     if (!isEligibleCandidate(ownGoal as GoalRow, candidateGoal as GoalRow | null)) {
-      if (!candidateGoal && (await isPausedMatchingGoal(db, candidateGoalId))) {
+      if (!candidateGoal && (await isPausedMatchingGoal(db, goalId, candidateGoalId))) {
         return reply(
           {
             error:
