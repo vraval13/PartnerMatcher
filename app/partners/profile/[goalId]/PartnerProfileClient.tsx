@@ -72,38 +72,64 @@ export default function PartnerProfileClient({
             Student profile
           </p>
 
-          <h1 className="mt-3 text-3xl font-bold">
-            {partner.display_name || "A student"}
-          </h1>
+          <h1 className="mt-3 text-3xl font-bold">{partner.display_name || "A student"}</h1>
 
           <div className="mt-6 space-y-3 text-sm">
             {partner.institution && (
-              <p><strong>Institution:</strong> {partner.institution}</p>
+              <p>
+                <strong>Institution:</strong> {partner.institution}
+              </p>
             )}
             {partner.category === "course" ? (
               <>
                 {partner.course_code && (
-                  <p><strong>Course:</strong> {partner.course_code}</p>
+                  <p>
+                    <strong>Course:</strong> {partner.course_code}
+                  </p>
                 )}
-                {partner.topic && <p><strong>Topic:</strong> {partner.topic}</p>}
+                {partner.topic && (
+                  <p>
+                    <strong>Topic:</strong> {partner.topic}
+                  </p>
+                )}
                 {partner.assignment_id && (
-                  <p><strong>Assignment:</strong> {partner.assignment_id}</p>
+                  <p>
+                    <strong>Assignment:</strong> {partner.assignment_id}
+                  </p>
                 )}
               </>
             ) : (
               <>
                 {partner.subject_or_skill && (
-                  <p><strong>Learning goal:</strong> {partner.subject_or_skill}</p>
+                  <p>
+                    <strong>Learning goal:</strong> {partner.subject_or_skill}
+                  </p>
                 )}
                 {partner.proficiency_level && (
-                  <p><strong>Proficiency:</strong> {partner.proficiency_level}</p>
+                  <p>
+                    <strong>Proficiency:</strong> {partner.proficiency_level}
+                  </p>
                 )}
               </>
             )}
-            {partner.mode && <p><strong>Mode:</strong> {partner.mode}</p>}
-            <p><strong>Location preference:</strong> {partner.location_preference}</p>
-            {partner.location && <p><strong>Meeting location:</strong> {partner.location}</p>}
-            {partner.due_date && <p><strong>Due date:</strong> {partner.due_date}</p>}
+            {partner.mode && (
+              <p>
+                <strong>Mode:</strong> {partner.mode}
+              </p>
+            )}
+            <p>
+              <strong>Location preference:</strong> {partner.location_preference}
+            </p>
+            {partner.location && (
+              <p>
+                <strong>Meeting location:</strong> {partner.location}
+              </p>
+            )}
+            {partner.due_date && (
+              <p>
+                <strong>Due date:</strong> {partner.due_date}
+              </p>
+            )}
           </div>
 
           <button

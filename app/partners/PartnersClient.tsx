@@ -175,8 +175,7 @@ export default function PartnersClient() {
         if (live) {
           setFavoriteGoalIds(
             data.favorites.flatMap(
-              (favorite: { candidate_goal_ids: string[] }) =>
-                favorite.candidate_goal_ids
+              (favorite: { candidate_goal_ids: string[] }) => favorite.candidate_goal_ids
             )
           );
         }
@@ -308,10 +307,7 @@ export default function PartnersClient() {
     const goalId = m.candidate_goal_id;
     const isFavorite = favoriteGoalIds.includes(goalId);
 
-    if (
-      isFavorite &&
-      !window.confirm(`Remove ${m.display_name} from your favorites?`)
-    ) {
+    if (isFavorite && !window.confirm(`Remove ${m.display_name} from your favorites?`)) {
       return;
     }
 
@@ -334,18 +330,12 @@ export default function PartnersClient() {
       setFavoriteMessages((prev) => ({
         ...prev,
         [goalId]:
-          result.message ??
-          (isFavorite
-            ? "Removed from favorites."
-            : "Added to favorites."),
+          result.message ?? (isFavorite ? "Removed from favorites." : "Added to favorites."),
       }));
     } catch (e) {
       setFavoriteMessages((prev) => ({
         ...prev,
-        [goalId]:
-          e instanceof Error
-            ? e.message
-            : "Unable to update favorites.",
+        [goalId]: e instanceof Error ? e.message : "Unable to update favorites.",
       }));
     } finally {
       setFavoriteBusy(null);

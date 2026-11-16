@@ -1,9 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import {
-  addFavorite,
-  listFavorites,
-  removeFavorite,
-} from "@/lib/favorites/http";
+import { addFavorite, listFavorites, removeFavorite } from "@/lib/favorites/http";
 
 export async function GET() {
   return listFavorites(await createClient());

@@ -40,10 +40,5 @@ export default async function PartnerProfilePage({
     .eq("favorite_user_id", goal.user_id)
     .maybeSingle();
 
-  return (
-    <PartnerProfileClient
-      partner={goal}
-      initiallyFavorited={Boolean(favorite)}
-    />
-  );
+  return <PartnerProfileClient partner={goal} initiallyFavorited={Boolean(favorite)} />;
 }

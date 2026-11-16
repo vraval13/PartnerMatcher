@@ -99,12 +99,10 @@ export async function addFavorite(db: SupabaseClient, request: Request) {
       return reply({ error: "This student is not available to favorite." }, 404);
     }
 
-    const { error: insertError } = await db
-      .from("favorite_partners")
-      .insert({
-        user_id: userId,
-        favorite_user_id: candidate.user_id,
-      });
+    const { error: insertError } = await db.from("favorite_partners").insert({
+      user_id: userId,
+      favorite_user_id: candidate.user_id,
+    });
 
     if (insertError?.code === "23505") {
       return reply({
