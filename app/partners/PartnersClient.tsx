@@ -81,6 +81,9 @@ export default function PartnersClient() {
   const [sentConnections, setSentConnections] = useState<
     Record<string, { id: string; status: string }>
   >({});
+  const [favoriteGoalIds, setFavoriteGoalIds] = useState<string[]>([]);
+  const [favoriteBusy, setFavoriteBusy] = useState<string | null>(null);
+  const [favoriteMessages, setFavoriteMessages] = useState<Record<string, string>>({});
   useEffect(() => {
     let live = true;
     api("/api/v1/matching-goals")
@@ -97,6 +100,29 @@ export default function PartnersClient() {
       live = false;
     };
   }, []);
+  useEffect(() => {
+    let live = true;
+
+    api("/api/v1/favorites")
+      .then((data) => {
+        if (live) {
+          setFavoriteGoalIds(
+            data.favorites.flatMap(
+              (favorite: { candidate_goal_ids: string[] }) =>
+                favorite.candidate_goal_ids
+            )
+          );
+        }
+      })
+      .catch((e) => {
+        if (live) setError(e.message);
+      });
+
+    return () => {
+      live = false;
+    };
+  }, []);
+
   function change<K extends keyof GoalInput>(key: K, value: GoalInput[K]) {
     setForm((f) => ({ ...f, [key]: value }));
   }
@@ -151,6 +177,54 @@ export default function PartnersClient() {
       setBusy(false);
     }
   }
+  async function toggleFavorite(m: Match) {
+    const goalId = m.candidate_goal_id;
+    const isFavorite = favoriteGoalIds.includes(goalId);
+
+    if (
+      isFavorite &&
+      !window.confirm(`Remove ${m.display_name} from your favorites?`)
+    ) {
+      return;
+    }
+
+    setFavoriteBusy(goalId);
+    setFavoriteMessages((prev) => ({ ...prev, [goalId]: "" }));
+
+    try {
+      const result = await api("/api/v1/favorites", {
+        method: isFavorite ? "DELETE" : "POST",
+        body: JSON.stringify({ candidate_goal_id: goalId }),
+      });
+
+      setFavoriteGoalIds((prev) => {
+        if (isFavorite) {
+          return prev.filter((id) => id !== goalId);
+        }
+        return prev.includes(goalId) ? prev : [...prev, goalId];
+      });
+
+      setFavoriteMessages((prev) => ({
+        ...prev,
+        [goalId]:
+          result.message ??
+          (isFavorite
+            ? "Removed from favorites."
+            : "Added to favorites."),
+      }));
+    } catch (e) {
+      setFavoriteMessages((prev) => ({
+        ...prev,
+        [goalId]:
+          e instanceof Error
+            ? e.message
+            : "Unable to update favorites.",
+      }));
+    } finally {
+      setFavoriteBusy(null);
+    }
+  }
+
   function openConnect(m: Match) {
     setConnectForm({
       session_topic: m.topic ?? "",
@@ -608,6 +682,31 @@ export default function PartnersClient() {
                     Times shown in your browser timezone. Scoring: {m.configuration_version}
                   </p>
                   <div className="mt-4">
+                    <a
+                      href={`/partners/profile/${m.candidate_goal_id}`}
+                      className="mb-3 mr-3 inline-block rounded-xl border border-slate-500/40 px-4 py-2 text-sm font-semibold"
+                    >
+                      View profile
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => toggleFavorite(m)}
+                      disabled={favoriteBusy === m.candidate_goal_id}
+                      className="mb-3 rounded-xl border border-slate-500/40 px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                    >
+                      {favoriteBusy === m.candidate_goal_id
+                        ? "Please wait…"
+                        : favoriteGoalIds.includes(m.candidate_goal_id)
+                          ? "Remove from favorites"
+                          : "Add to favorites"}
+                    </button>
+
+                    {favoriteMessages[m.candidate_goal_id] && (
+                      <p role="status" className="mb-3 text-sm opacity-80">
+                        {favoriteMessages[m.candidate_goal_id]}
+                      </p>
+                    )}
+
                     {(() => {
                       const sent = sentConnections[m.candidate_goal_id];
                       if (!sent) {
