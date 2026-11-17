@@ -1,9 +1,32 @@
 export const instant = false;
 
+import type { Metadata } from "next";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CoursesClient } from "./CoursesClient";
+
+export const metadata: Metadata = {
+  title: "Manage courses",
+  description: "Add, edit or remove the courses you are studying.",
+};
+
+type CourseRef = { name: string | null; code: string | null };
+
+type UserCourseRow = {
+  course_id: string;
+  goal: string | null;
+  semester: string | null;
+  courses: CourseRef | CourseRef[] | null;
+};
+
+function currentSemester(): string {
+  const m = new Date().getMonth() + 1;
+  const y = new Date().getFullYear();
+  if (m <= 5) return `Spring ${y}`;
+  if (m <= 7) return `Summer ${y}`;
+  return `Fall ${y}`;
+}
 
 export default async function EditCoursesPage() {
   await connection();
@@ -33,33 +56,29 @@ export default async function EditCoursesPage() {
     console.error("Failed to load courses:", error.message);
   }
 
-  const courses = (courseRows ?? [])
-    .map(
-      (row: {
-        course_id: string;
-        goal: string | null;
-        semester: string | null;
-        courses:
-          | { name: string | null; code: string | null }
-          | { name: string | null; code: string | null }[]
-          | null;
-      }) => {
-        const course = Array.isArray(row.courses) ? row.courses[0] : row.courses;
+  const fallbackSemester = currentSemester();
 
-        if (!course) return null;
+  const courses = ((courseRows ?? []) as UserCourseRow[]).flatMap((row) => {
+    const course = Array.isArray(row.courses) ? row.courses[0] : row.courses;
+    if (!course) return [];
 
-        return {
-          course_id: row.course_id,
-          name: course.name ?? "",
-          code: course.code ?? "",
-          goal: row.goal ?? "study",
-          semester: row.semester ?? "Fall 2026",
-        };
-      }
-    )
-    .filter((course) => course !== null);
+    return [
+      {
+        course_id: row.course_id,
+        name: course.name ?? "",
+        code: course.code ?? "",
+        goal: row.goal ?? "study",
+        semester: row.semester ?? fallbackSemester,
+      },
+    ];
+  });
 
   return (
-    <CoursesClient userId={user.id} university={profile.university} initialCourses={courses} />
+    <CoursesClient
+      user={user}
+      userId={user.id}
+      university={profile.university}
+      initialCourses={courses}
+    />
   );
 }
