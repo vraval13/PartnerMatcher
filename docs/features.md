@@ -91,41 +91,109 @@ Status legend: ✅ Done · 🚧 In progress · 📋 Planned · 💡 Idea
 
 ---
 
-## Phase 2 — Discovery & Matching 📋
+## Phase 2 — Discovery & Matching ✅ (Sprint 3)
 
-### 📋 Profile Editor (`/profile/edit`)
+### ✅ Matching Goals (`/partners`) — US-01
 
-- Edit bio, avatar, university, major, year
-- Update study style, comm pref, timezone
-- Add / remove courses with goal + proficiency
-- Add / remove skills with level + seeking-partner toggle
-- Availability calendar (weekly grid, timezone-aware)
+- Create a matching goal: category (Course study / Exam preparation / Skill or language practice), subject or skill, proficiency level, timezone, location preference, weekly availability slots (up to 21)
+- Course study goals: add institution, course code, topic; assignment mode adds assignment ID and due date
+- Exam preparation goals: add exam date, preparation start/end dates
+- Goals can be listed (visible to compatible students) or private
+- Pause / resume matching visibility (US-16) — existing requests unaffected when paused
+- Remove a goal at any time
 
-### 📋 Real Match Feed (`/dashboard`)
+### ✅ Partner Matching (`/partners`) — US-04/05/07
 
-- Replace empty state with ranked partner cards from `match_scores`
-- Score badge, shared courses, availability overlap hours
-- Filter by course, goal, min score
-- Pagination / infinite scroll
+- `POST /api/v1/matches` ranks compatible candidates from the user's selected goal
+- Scoring weights:
+  - Course study / exam prep: topic 40%, availability 35%, location 25%
+  - Skill / language practice: skill 25%, availability 50%, location 25%
+- Urgency multiplier for exam prep and assignment mode: ≤2 days ×1.2; ≤7 days ×1.1; otherwise ×1.0
+- Results show score breakdown, overlapping time slots (browser-local), partner name and goal detail
+- Exam preparation (US-07) and recurring practice partner matching (US-07) both live under this flow
 
-### 📋 User Profile View (`/users/:id`)
+### ✅ Availability Management (`/availability`) — US-02
 
-- Public profile: name, avatar, university, major, year, bio, courses, skills, average rating
-- "Request to study" CTA
-- Available slots shown in viewer's local timezone
+- Add and remove weekly availability slots
+- Each slot: day of week, start time, end time, IANA timezone
+- Validation: time format (`HH:MM`), valid IANA timezone, end must be after start, max 21 slots
+- `POST/DELETE /api/v1/availability`
 
-### 📋 Matching Algorithm
+### ✅ Connection Requests (`/requests`) — US-08/11/12/13
 
-- Weighted score: courses (40%), availability (25%), skills (20%), study style (10%), comm pref (5%)
-- Scores pre-computed and stored in `match_scores` table
-- Recomputed when a user updates profile, availability, or courses
+- **Send** (US-08): propose a session with topic, start datetime, end datetime, optional message; eligibility check ensures candidate is compatible and not already connected
+- **List received** (US-11): tab showing incoming requests with status badge, partner name, proposed session details
+- **List sent** (US-11): tab showing outgoing requests with current status
+- **Cancel sent** (US-12): sender can cancel a pending request; terminal states (accepted/rejected/blocked) are locked
+- **Accept / Decline** (US-13): receiver can accept or decline; status updates immediately in UI
+- Filter bar: filter by status (all / pending / accepted / rejected / cancelled), sort by date, free-text search across name and topic
+- Stat tiles: counts for pending, accepted, declined, cancelled
 
-### 📋 Connection Request Flow
+### ✅ Favorite Partners (`/partners`) — US-17
 
-- Send request with optional message
-- Receiver gets in-app notification
-- Accept / Decline / Block
-- Accepted → both users appear in each other's partner list
+- Star/heart button on each match-result card
+- `POST/DELETE /api/v1/favorites`; persisted in database
+- Favorites survive a page reload; shown across sessions
+
+### ✅ Partner Profile Preview — US-07
+
+- `/partners/profile/[goalId]`: view a matched partner's public profile
+- Shows courses, weekly availability, compatibility score breakdown
+- Linked from match-result cards via "View profile" button
+
+### ✅ Dynamic Dashboard (`/dashboard`) — US-25
+
+- Left sidebar (`Sidebar.tsx`) shared by all five app pages
+- Right sidebar (`RightSidebar.tsx`): mini calendar, upcoming study sessions, profile summary card
+- Dashboard content: match feed, stat tiles, suggested partner cards
+
+### ✅ Profile Editor (`/profile`)
+
+- 4 numbered sections: 01 / Personal, 02 / Education, 03 / Preferences, 04 / Learning
+- Sidebar card: avatar initials, academic summary, enrolled-course count, profile-completion progress bar
+- Save changes updates both `auth.users` metadata (name) and `profiles` table (university, major, year, study style, comm pref, timezone)
+
+### ✅ Course Management (`/profile/courses`)
+
+- Add up to 5 courses; each has name, code, study goal, semester
+- Per-field validation with inline error messages
+- Dirty-state detection: "Save courses" is only active when unsaved changes exist
+- Removes de-linked courses from `user_courses` on save
+
+---
+
+## Phase 2b — UI Design System ✅ (Sprint 4)
+
+### ✅ Teal Brand System
+
+- Replaced all indigo references (`bg-indigo-600`, `text-indigo-500`, `#6366f1`) app-wide with five CSS custom-property tokens: `--brand`, `--brand-strong`, `--brand-fg`, `--brand-soft-bg`, `--brand-soft-border`
+- Light and dark variants defined in `globals.css`; zero Tailwind hardcodes remain in the authenticated app shell
+- Updated: `--shadow-card`, `--nav-shadow`, `.gradient-text-animated`, `.card-3d` hover glow, `pulse-ring` keyframe
+
+### ✅ Shared Sidebar Redesign (`app/dashboard/Sidebar.tsx`)
+
+- **Logo**: rainbow-arc SVG + "Partner**Matcher**" two-tone wordmark; strokes use `var(--brand)`
+- **Layout**: `flex flex-col`; nav section scrolls independently; bottom section always visible
+- **Bottom section**: Profile row (initials + name + "View profile" link) · Dark/Light theme toggle · Sign out
+
+### ✅ Consistent Page Headers
+
+All four app pages (Partners, Profile, Courses, Requests) now share the same header pattern:
+
+- Teal eyebrow label (section context)
+- Bold `h1` heading
+- Subtitle / description paragraph
+- Dark/light theme toggle button (top-right)
+
+### ✅ Partners Page Retheme (`app/partners/PartnersClient.tsx`)
+
+Previously had no CSS-variable theming; rebuilt from scratch:
+
+- Fully-themed `inputClass` with focus ring and card-inner background
+- Proper card backgrounds on all five bordered sections
+- Brand-colored primary buttons; card-outline secondary buttons
+- Inline-style banners for error and info states
+- Match-result score chip (teal soft-bg); themed connect-request modal
 
 ---
 
@@ -184,4 +252,4 @@ Status legend: ✅ Done · 🚧 In progress · 📋 Planned · 💡 Idea
 
 ---
 
-_Last updated: 2026-11-01 (Sprint 4 complete — US-22 + US-23 shipped)._
+_Last updated: 2026-11-17 (Sprint 4 complete — UI redesign & teal brand system shipped)._

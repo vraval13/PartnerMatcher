@@ -5,7 +5,77 @@ Format: `[version] — YYYY-MM-DD` · `Added` · `Changed` · `Fixed` · `Remove
 
 ---
 
-## [0.5.0] — 2026-11-01 (Sprint 4 — US-22 + US-23 production hardening)
+## [0.7.0] — 2026-11-17 (Sprint 4 — UI Redesign & Design System)
+
+### Added
+
+- **Teal brand token system** — five new CSS custom properties in `globals.css`: `--brand`, `--brand-strong`, `--brand-fg`, `--brand-soft-bg`, `--brand-soft-border`; defined for both light (`:root`) and dark (`.dark`) modes
+- **Sidebar bottom section** (`app/dashboard/Sidebar.tsx`) — three pinned items below a divider:
+  - Profile row: user initials chip (teal soft-bg) + display name + "View profile" subtitle, links to `/profile`, active-highlights when on that route
+  - Dark/light theme toggle: sun/moon icon button, label reads "Dark mode" / "Light mode"; calls `useTheme().toggle()`
+  - Sign out button: consistent icon + label
+- **Sidebar logo** — replaced placeholder "PM" square with the same rainbow-arc SVG + two-tone wordmark used on the landing page navbar; all strokes now use `var(--brand)` instead of hardcoded `#6366f1`
+- **Partners page header** (`PartnersClient.tsx`) — eyebrow label "Partner matching" (teal), `h1`, description paragraph, and theme toggle button matching the other three pages' header pattern
+- **Partners connect-request modal** — proper card surface (`--bg-card`) with border, themed heading, brand-colored submit button, card-outline cancel button
+
+### Changed
+
+- **Brand color**: every `bg-indigo-600`, `text-indigo-500`, and `#6366f1` reference across `Sidebar.tsx`, `ProfileClient.tsx`, `CoursesClient.tsx`, `PartnersClient.tsx`, `RequestsClient.tsx` replaced with the new `var(--brand)` / `var(--brand-soft-bg)` / `var(--brand-strong)` tokens
+- **`globals.css`**: `--shadow-card` and `--nav-shadow` updated to teal-based rgba; `.gradient-text-animated` gradient stops changed from indigo/purple to teal/cyan; `.card-3d` hover glow and `pulse-ring` keyframe box-shadow changed from `rgba(99,102,241,…)` to `rgba(13,148,136,…)` (light) / `rgba(45,212,191,…)` (dark)
+- **Sidebar layout**: changed from single scrolling `aside` to `flex flex-col`; nav section scrolls independently; bottom section is `shrink-0` (always visible)
+- **Profile card banner** (`ProfileClient.tsx`): top strip changed from flat `var(--text-heading)` to `linear-gradient(135deg, var(--brand), var(--brand-strong))`
+- **Profile completion bar** and percentage text: changed from `#6366f1` to `var(--brand)`
+- **Save buttons** on Profile and Courses pages: changed from `var(--text-heading)` / `var(--bg-page)` to `var(--brand)` / `var(--brand-fg)`
+- **Requests tab switcher**: active tab background changed from `var(--text-heading)` to `var(--brand)`; pending count badge changed from `#6366f1` to `var(--brand)` when inactive
+- **PartnersClient `inputClass`**: redefined from raw `border-slate-500/40 bg-transparent` to fully-themed string using `--bg-card-inner`, `--border-card`, `--text-heading`, focus ring via `--brand-soft-bg` / `--brand`
+- **Partners card sections**: all five bordered-but-transparent containers now have explicit `var(--bg-card)` or `var(--bg-card-inner)` backgrounds
+- **Partners buttons**: six primary buttons → `var(--brand)` / `var(--brand-fg)`; five outline buttons → `var(--bg-card)` / `var(--border-card)` / `var(--text-sub)`
+- **Partners banners**: error banners use `rgba(220,38,38,…)` pattern; info/status banner uses `var(--brand-soft-border)` / `var(--brand-soft-bg)` / `var(--brand-strong)`
+- **Partners match-result cards**: score displayed as a teal soft-bg chip; name uses `--text-heading`
+
+### Fixed
+
+- **`CoursesClient.tsx`** — `uidCounter.current` was read inside the `useState` lazy initializer (render-phase ref access; `react-hooks/refs` lint error). Fixed by seeding UIDs from the array index during initialisation and starting the counter at `initialCourses.length`.
+- **`RequestsClient.tsx`** — `window.location.hash = v` was assigned directly in the `switchView` event handler (`react-hooks/immutability` lint error). Moved into a `useEffect` keyed on `view`, with a `useRef` sentinel that skips the first mount to avoid rewriting the hash that drove the initial tab state. Added `useRef` to the React import.
+- **Navbar.tsx logo**: strokes remain `#6366f1` on the public landing page (by design, the landing page has not been rebanded — only the authenticated app shell has changed).
+
+---
+
+## [0.6.0] — 2026-11-11 (Sprint 3 — Matching, Connections & Partner Features)
+
+### Added
+
+- **US-01: Matching goal creation** — `POST /api/v1/matching-goals`; validates category, subject, proficiency, timezone, availability; `lib/matching/information.ts` for field schemas and error types
+- **US-02: Availability CRUD** — `POST/DELETE /api/v1/availability`; `lib/availability/` for time-format, IANA timezone, day-of-week validation and 21-slot cap; `AvailabilityClient.tsx`
+- **US-04 / US-05: Course + assignment matching** — `POST /api/v1/matches`; `lib/matching/engine.ts` (`rankCandidates()`) scores topic 40%, availability 35%, location 25%; assignment mode adds due-date urgency multiplier
+- **US-07: Exam preparation + practice partner matching** — exam-date fields (`exam_date`, `prep_start`, `prep_end`); `exam_prep` and `skill_practice` categories with their own weight profiles
+- **US-08: Send connection request** — `POST /api/v1/connections`; `session_topic`, `proposed_start`, `proposed_end` fields; `isEligibleCandidate()` eligibility check; 409 duplicate guard
+- **US-11: List connection requests** — `GET /api/v1/connections` (received); `GET /api/v1/connections/sent`; both return paginated results with status and partner metadata
+- **US-12: Cancel sent request** — `PATCH /api/v1/connections/[id]` (sender path); terminal-state guard (cannot cancel accepted/rejected/blocked)
+- **US-13: Accept / decline received request** — `PATCH /api/v1/connections/[id]` with `action: "accept" | "decline"`; ownership guard (receiver only)
+- **US-16: Pause / resume matching** — `PATCH /api/v1/matching-status`; hides all listed goals from new searches; existing accepted connections unaffected; `lib/matching/status.ts`
+- **US-17: Favorite partners** — `POST/DELETE /api/v1/favorites`; persisted per user; `lib/favorites/http.ts`; star/heart icon on match-result cards
+- **US-25: Dynamic dashboard** — right sidebar (`RightSidebar.tsx`) with mini calendar, upcoming study sessions, profile summary card; left sidebar extracted to shared `Sidebar.tsx`
+- **Partner profile preview** — `/partners/profile/[goalId]` page showing courses, weekly availability, compatibility score breakdown
+- **`PartnersClient.tsx`** — full partner-search UI: create goal form, goal selector, Find partners search, match-result cards, connect-request modal
+- **`RequestsClient.tsx`** — received/sent tab switcher, filter bar (status/sort/search), `ReceivedCard` / `SentCard` components, stat tiles, accept/decline/cancel actions
+- **`ProfileClient.tsx`** — full profile editor with 4 numbered sections, profile-completion progress bar, sidebar summary card
+- **`CoursesClient.tsx`** — course management with per-field validation, quota badge, dirty-state detection, cancel-with-discard
+- **39 new tests**: `connections-cancel.test.ts` (21), `connections-respond.test.ts` (14), `matching-status.test.ts` (4) — total **191 tests**
+
+### Changed
+
+- **Dashboard**: replaced hardcoded suggested partners with dynamic match data; added right sidebar with calendar and profile card
+- **`Sidebar.tsx`**: extracted from `DashboardClient.tsx` into a shared component imported by all five app pages
+
+### Fixed
+
+- `fix(us-16)`: restrict paused-goal status lookup — only the goal owner can read their own paused goals; peers cannot see them in search
+- `fix(us-16)`: handle paused profiles returned by cached match results — UI correctly shows "Listed (paused)" state
+
+---
+
+## [0.5.0] — 2026-11-01 (Sprint 2 — US-22 + US-23 production hardening)
 
 ### Added
 
