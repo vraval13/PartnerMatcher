@@ -1,18 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import type { User } from "@supabase/supabase-js";
+import { Sidebar } from "@/app/dashboard/Sidebar";
 import { createClient } from "@/lib/supabase/client";
-
-function currentSemester(): string {
-  const m = new Date().getMonth() + 1;
-  const y = new Date().getFullYear();
-  if (m <= 5) return `Spring ${y}`;
-  if (m <= 7) return `Summer ${y}`;
-  return `Fall ${y}`;
-}
 import { useTheme } from "@/app/components/ThemeProvider";
+
+/* -------------------------------------------------------------------------- */
+/*  Types & constants                                                          */
+/* -------------------------------------------------------------------------- */
 
 type Course = {
   course_id: string;
@@ -22,19 +20,165 @@ type Course = {
   semester: string;
 };
 
+type Draft = Course & { uid: string };
+type FieldErrors = Record<string, { name?: string; code?: string }>;
+
+const MAX_COURSES = 5;
+
 const goals = [
-  { value: "study", label: "General study" },
-  { value: "exam_prep", label: "Exam prep" },
-  { value: "project", label: "Project" },
-  { value: "tutoring", label: "Tutoring" },
-  { value: "general", label: "Explore" },
+  { value: "study", label: "General study", hint: "Regular coursework" },
+  { value: "exam_prep", label: "Exam prep", hint: "Quizzes & finals" },
+  { value: "project", label: "Project", hint: "Group or solo work" },
+  { value: "tutoring", label: "Tutoring", hint: "Teach or get help" },
+  { value: "general", label: "Explore", hint: "Just browsing" },
 ];
 
+function currentSemester(): string {
+  const m = new Date().getMonth() + 1;
+  const y = new Date().getFullYear();
+  if (m <= 5) return `Spring ${y}`;
+  if (m <= 7) return `Summer ${y}`;
+  return `Fall ${y}`;
+}
+
+function semesterOptions(extra: string[]): string[] {
+  const y = new Date().getFullYear();
+  const base: string[] = [];
+  for (let year = y - 1; year <= y + 1; year++) {
+    base.push(`Spring ${year}`, `Summer ${year}`, `Fall ${year}`);
+  }
+  return Array.from(new Set([...base, ...extra.filter(Boolean)]));
+}
+
+const inputClass =
+  "mt-1.5 w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none transition bg-[var(--bg-card-inner)] border-[var(--border-card)] text-[var(--text-heading)] placeholder:opacity-40 focus:border-[var(--brand)] focus:ring-4 focus:ring-[var(--brand-soft-bg)]";
+
+const labelClass = "block text-[13px] font-medium";
+
+const ghostStyle = {
+  backgroundColor: "var(--bg-card)",
+  borderColor: "var(--border-card)",
+  color: "var(--text-sub)",
+} as const;
+
+/* -------------------------------------------------------------------------- */
+/*  Small components                                                           */
+/* -------------------------------------------------------------------------- */
+
+function Icon({ d, size = 16 }: { d: ReactNode; size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {d}
+    </svg>
+  );
+}
+
+const icons = {
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 3v2M12 19v2M3 12h2M19 12h2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+    </>
+  ),
+  moon: <path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z" />,
+  plus: <path d="M12 5v14M5 12h14" />,
+  trash: <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />,
+  check: <path d="m5 12 5 5L20 7" />,
+  close: <path d="M18 6 6 18M6 6l12 12" />,
+  alert: (
+    <>
+      <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+      <path d="M12 9v4M12 17h.01" />
+    </>
+  ),
+  school: (
+    <>
+      <path d="m22 9-10-5L2 9l10 5 10-5Z" />
+      <path d="M6 11v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5" />
+    </>
+  ),
+  book: (
+    <>
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5Z" />
+      <path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5" />
+    </>
+  ),
+};
+
+function Spinner() {
+  return (
+    <span
+      className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+      aria-hidden="true"
+    />
+  );
+}
+
+function Banner({
+  kind,
+  text,
+  onDismiss,
+}: {
+  kind: "error" | "success";
+  text: string;
+  onDismiss: () => void;
+}) {
+  const isError = kind === "error";
+  return (
+    <div
+      role={isError ? "alert" : "status"}
+      className="mt-5 flex items-start gap-3 rounded-xl border p-4 text-sm"
+      style={
+        isError
+          ? {
+              borderColor: "rgba(220,38,38,0.35)",
+              backgroundColor: "rgba(220,38,38,0.1)",
+              color: "#b91c1c",
+            }
+          : {
+              borderColor: "rgba(22,163,74,0.35)",
+              backgroundColor: "rgba(22,163,74,0.1)",
+              color: "#15803d",
+            }
+      }
+    >
+      <span className="mt-0.5">
+        <Icon d={isError ? icons.alert : icons.check} />
+      </span>
+      <p className="flex-1 font-medium">{text}</p>
+      <button
+        type="button"
+        onClick={onDismiss}
+        className="opacity-60 transition hover:opacity-100"
+        aria-label="Dismiss"
+      >
+        <Icon d={icons.close} size={14} />
+      </button>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Main component                                                             */
+/* -------------------------------------------------------------------------- */
+
 export function CoursesClient({
+  user,
   userId,
   university,
   initialCourses,
 }: {
+  user: User;
   userId: string;
   university: string;
   initialCourses: Course[];
@@ -47,23 +191,86 @@ export function CoursesClient({
   };
   const { theme, toggle } = useTheme();
 
-  const [courses, setCourses] = useState<Course[]>(initialCourses);
+  const handleSignOut = async () => {
+    await getSupabase().auth.signOut();
+    router.push("/signin");
+    router.refresh();
+  };
+
+  const uidCounter = useRef(initialCourses.length);
+  const nextUid = () => `draft-${uidCounter.current++}`;
+
+  const [courses, setCourses] = useState<Draft[]>(() =>
+    initialCourses.map((c, i) => ({ ...c, uid: `draft-${i}` }))
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
-  function updateCourse(index: number, field: keyof Course, value: string) {
-    setCourses((current) =>
-      current.map((course, i) => (i === index ? { ...course, [field]: value } : course))
+  // Snapshot of what is stored, used to detect unsaved changes.
+  const serialize = (list: Course[]) =>
+    JSON.stringify(
+      list.map(({ course_id, name, code, goal, semester }) => ({
+        course_id,
+        name,
+        code,
+        goal,
+        semester,
+      }))
     );
+  const [savedSnapshot, setSavedSnapshot] = useState(() => serialize(initialCourses));
+  const dirty = useMemo(() => serialize(courses) !== savedSnapshot, [courses, savedSnapshot]);
+
+  // Warn before leaving the page with unsaved edits.
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [dirty]);
+
+  // Auto-dismiss the success message.
+  useEffect(() => {
+    if (!message) return;
+    const t = setTimeout(() => setMessage(""), 4000);
+    return () => clearTimeout(t);
+  }, [message]);
+
+  const semesters = useMemo(() => semesterOptions(courses.map((c) => c.semester)), [courses]);
+
+  // Warn (not block) when the same course code appears twice with the same goal.
+  const duplicateCodes = useMemo(() => {
+    const seen = new Map<string, number>();
+    for (const c of courses) {
+      const key = `${c.code.trim().toLowerCase()}|${c.goal}`;
+      if (!c.code.trim()) continue;
+      seen.set(key, (seen.get(key) ?? 0) + 1);
+    }
+    return new Set([...seen.entries()].filter(([, n]) => n > 1).map(([k]) => k));
+  }, [courses]);
+
+  function updateCourse(uid: string, field: keyof Course, value: string) {
+    setCourses((current) =>
+      current.map((course) => (course.uid === uid ? { ...course, [field]: value } : course))
+    );
+    if (field === "name" || field === "code") {
+      setFieldErrors((prev) => {
+        if (!prev[uid]?.[field]) return prev;
+        return { ...prev, [uid]: { ...prev[uid], [field]: undefined } };
+      });
+    }
   }
 
   function addCourse() {
-    if (courses.length >= 5) return;
-
+    if (courses.length >= MAX_COURSES) return;
     setCourses((current) => [
       ...current,
       {
+        uid: nextUid(),
         course_id: "",
         name: "",
         code: "",
@@ -73,32 +280,51 @@ export function CoursesClient({
     ]);
   }
 
-  function removeCourse(index: number) {
-    setCourses((current) => current.filter((_, i) => i !== index));
+  function removeCourse(uid: string) {
+    setCourses((current) => current.filter((c) => c.uid !== uid));
+    setFieldErrors((prev) => {
+      const { [uid]: _removed, ...rest } = prev;
+      return rest;
+    });
+  }
+
+  function resetChanges() {
+    if (!window.confirm("Discard all unsaved changes?")) return;
+    setCourses(JSON.parse(savedSnapshot).map((c: Course) => ({ ...c, uid: nextUid() })));
+    setFieldErrors({});
+    setError("");
   }
 
   async function saveCourses() {
     setError("");
     setMessage("");
+    setFieldErrors({});
 
-    const validCourses = courses.filter((course) => course.name.trim());
+    // Rows that are completely empty are ignored, as before.
+    const validCourses = courses.filter((course) => course.name.trim() || course.code.trim());
 
     if (validCourses.length === 0) {
       setError("Please keep at least one course.");
       return;
     }
 
-    const incompleteCourse = validCourses.find((course) => !course.code.trim());
-
-    if (incompleteCourse) {
-      setError("Please enter a course code for every course.");
+    const errors: FieldErrors = {};
+    for (const course of validCourses) {
+      if (!course.name.trim())
+        errors[course.uid] = { ...errors[course.uid], name: "Enter the course name." };
+      if (!course.code.trim())
+        errors[course.uid] = { ...errors[course.uid], code: "Enter the course code." };
+    }
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setError("Please fill in the course name and code for every course.");
       return;
     }
 
     setSaving(true);
 
     try {
-      const savedCourseIds: string[] = [];
+      const goalsByCourseId = new Map<string, Set<string>>();
 
       for (const course of validCourses) {
         const courseName = course.name.trim();
@@ -111,9 +337,7 @@ export function CoursesClient({
           .eq("university", university)
           .maybeSingle();
 
-        if (searchError) {
-          throw new Error(searchError.message);
-        }
+        if (searchError) throw new Error(searchError.message);
 
         let courseId: string;
 
@@ -122,22 +346,19 @@ export function CoursesClient({
         } else {
           const { data: newCourse, error: insertError } = await getSupabase()
             .from("courses")
-            .insert({
-              name: courseName,
-              code: courseCode,
-              university,
-            })
+            .insert({ name: courseName, code: courseCode, university })
             .select("id")
             .single();
 
           if (insertError || !newCourse) {
             throw new Error(insertError?.message ?? "Could not create the course.");
           }
-
           courseId = newCourse.id;
         }
 
-        savedCourseIds.push(courseId);
+        const goalSet = goalsByCourseId.get(courseId) ?? new Set<string>();
+        goalSet.add(course.goal);
+        goalsByCourseId.set(courseId, goalSet);
 
         const { error: associationError } = await getSupabase()
           .from("user_courses")
@@ -148,29 +369,39 @@ export function CoursesClient({
               goal: course.goal,
               semester: course.semester || currentSemester(),
             },
-            {
-              onConflict: "user_id,course_id,goal",
-              ignoreDuplicates: false,
-            }
+            { onConflict: "user_id,course_id,goal", ignoreDuplicates: false }
           );
 
-        if (associationError) {
-          throw new Error(associationError.message);
-        }
+        if (associationError) throw new Error(associationError.message);
       }
 
-      const uniqueCourseIds = [...new Set(savedCourseIds)];
+      const uniqueCourseIds = [...goalsByCourseId.keys()];
 
+      // Remove courses the user no longer has.
       const { error: deleteError } = await getSupabase()
         .from("user_courses")
         .delete()
         .eq("user_id", userId)
         .not("course_id", "in", `(${uniqueCourseIds.join(",")})`);
 
-      if (deleteError) {
-        throw new Error(deleteError.message);
+      if (deleteError) throw new Error(deleteError.message);
+
+      // Remove stale rows for a kept course whose goal was changed (the upsert key includes goal).
+      for (const [courseId, goalSet] of goalsByCourseId) {
+        const { error: staleError } = await getSupabase()
+          .from("user_courses")
+          .delete()
+          .eq("user_id", userId)
+          .eq("course_id", courseId)
+          .not("goal", "in", `(${[...goalSet].join(",")})`);
+
+        if (staleError) throw new Error(staleError.message);
       }
 
+      // Reflect the cleaned list locally so the dirty indicator resets.
+      const cleaned = courses.filter((c) => c.name.trim() || c.code.trim());
+      setCourses(cleaned);
+      setSavedSnapshot(serialize(cleaned));
       setMessage("Your courses have been saved successfully.");
       router.refresh();
     } catch (err) {
@@ -180,206 +411,356 @@ export function CoursesClient({
     }
   }
 
-  const inputClass =
-    "mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-500 dark:focus:ring-indigo-500/10";
-
-  const labelClass = "block text-sm font-medium text-slate-700 dark:text-slate-300";
+  const filledCount = courses.length;
+  const progress = (filledCount / MAX_COURSES) * 100;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 transition-colors duration-300 dark:bg-[#08080f] dark:text-slate-100">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-[#08080f]/95">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-5 py-4 sm:px-8">
-          <Link
-            href="/profile"
-            className="text-sm font-semibold text-slate-600 transition hover:text-indigo-600 dark:text-slate-300 dark:hover:text-indigo-400"
-          >
-            ← Back to Profile
-          </Link>
+    <div
+      className="min-h-screen transition-colors duration-300"
+      style={{ backgroundColor: "var(--bg-page)", color: "var(--text-page)" }}
+    >
+      <Sidebar user={user} onSignOut={handleSignOut} />
 
-          <div className="flex items-center gap-4">
+      <main className="ml-64 min-h-screen px-8 py-10 pb-32">
+        <div className="mx-auto max-w-3xl">
+          {/* ------------------------------ Header ------------------------------ */}
+          <header className="flex items-start justify-between gap-4">
+            <div>
+              <nav
+                aria-label="Breadcrumb"
+                className="flex items-center gap-2 text-xs font-medium"
+                style={{ color: "var(--text-muted)" }}
+              >
+                <Link href="/profile" className="transition hover:opacity-80">
+                  Profile
+                </Link>
+                <span aria-hidden="true">/</span>
+                <span style={{ color: "var(--text-sub)" }}>Courses</span>
+              </nav>
+              <h1
+                className="mt-3 text-3xl font-bold tracking-tight"
+                style={{ color: "var(--text-heading)" }}
+              >
+                Manage your courses
+              </h1>
+              <p className="mt-2 max-w-xl text-sm leading-6" style={{ color: "var(--text-muted)" }}>
+                Add, edit or remove courses to find students studying the same subjects.
+              </p>
+            </div>
+
             <button
               type="button"
               onClick={toggle}
               aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
               title={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition hover:opacity-80"
+              style={ghostStyle}
             >
-              {theme === "light" ? (
-                <svg
-                  width="19"
-                  height="19"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M12 3v2" />
-                  <path d="M12 19v2" />
-                  <path d="m4.22 4.22 1.42 1.42" />
-                  <path d="m18.36 18.36 1.42 1.42" />
-                  <path d="M3 12h2" />
-                  <path d="M19 12h2" />
-                  <path d="m4.22 19.78 1.42-1.42" />
-                  <path d="m18.36 5.64 1.42-1.42" />
-                  <circle cx="12" cy="12" r="4" />
-                </svg>
-              ) : (
-                <svg
-                  width="19"
-                  height="19"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z" />
-                </svg>
-              )}
+              <Icon d={theme === "light" ? icons.sun : icons.moon} size={18} />
             </button>
+          </header>
 
-            <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
-              PartnerMatcher
-            </span>
-          </div>
-        </div>
-      </header>
+          {/* ------------------------- University summary ----------------------- */}
+          <section
+            className="mt-7 rounded-2xl border p-5"
+            style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-card)" }}
+            aria-label="University and course allowance"
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span
+                  className="flex h-10 w-10 items-center justify-center rounded-xl"
+                  style={{ backgroundColor: "var(--brand-soft-bg)", color: "var(--brand-strong)" }}
+                >
+                  <Icon d={icons.school} size={19} />
+                </span>
+                <div>
+                  <p
+                    className="text-xs font-medium uppercase tracking-wider"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    Your university
+                  </p>
+                  <p className="text-sm font-semibold" style={{ color: "var(--text-heading)" }}>
+                    {university}
+                  </p>
+                </div>
+              </div>
 
-      <main className="mx-auto max-w-3xl px-5 py-10 sm:px-8">
-        <div className="mb-8">
-          <p className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-            Academic information
-          </p>
-
-          <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">
-            Manage your courses
-          </h1>
-
-          <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-            Add, edit or remove courses to find students studying the same subjects.
-          </p>
-        </div>
-
-        <div className="mb-6 flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#111119]">
-          <div>
-            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              Your university
-            </p>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{university}</p>
-          </div>
-
-          <span className="rounded-xl bg-indigo-50 px-3 py-2 text-sm font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
-            {courses.length}/5 courses
-          </span>
-        </div>
-
-        <div className="space-y-4">
-          {courses.map((course, index) => (
-            <section
-              key={index}
-              className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-colors dark:border-slate-800 dark:bg-[#111119]"
+              <div className="text-right">
+                <p
+                  className="text-sm font-bold tabular-nums"
+                  style={{ color: "var(--text-heading)" }}
+                >
+                  {filledCount}
+                  <span style={{ color: "var(--text-muted)" }}> / {MAX_COURSES} courses</span>
+                </p>
+                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  {MAX_COURSES - filledCount === 0
+                    ? "Limit reached"
+                    : `${MAX_COURSES - filledCount} remaining`}
+                </p>
+              </div>
+            </div>
+            <div
+              className="mt-4 h-1.5 overflow-hidden rounded-full"
+              style={{ backgroundColor: "var(--border-card)" }}
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={MAX_COURSES}
+              aria-valuenow={filledCount}
+              aria-label="Courses used"
             >
-              <div className="mb-5 flex items-center justify-between">
-                <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                  Course {String(index + 1).padStart(2, "0")}
-                </h2>
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{ width: `${progress}%`, backgroundColor: "var(--brand)" }}
+              />
+            </div>
+          </section>
 
+          {error && <Banner kind="error" text={error} onDismiss={() => setError("")} />}
+          {message && <Banner kind="success" text={message} onDismiss={() => setMessage("")} />}
+
+          {/* ----------------------------- Course list -------------------------- */}
+          <div className="mt-6 space-y-4">
+            {courses.length === 0 && (
+              <div
+                className="flex flex-col items-center rounded-2xl border border-dashed px-6 py-14 text-center"
+                style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-card)" }}
+              >
+                <span
+                  className="flex h-12 w-12 items-center justify-center rounded-2xl"
+                  style={{ backgroundColor: "var(--brand-soft-bg)", color: "var(--brand-strong)" }}
+                >
+                  <Icon d={icons.book} size={22} />
+                </span>
+                <p className="mt-4 text-sm font-semibold" style={{ color: "var(--text-heading)" }}>
+                  No courses yet
+                </p>
+                <p className="mt-1 max-w-xs text-sm" style={{ color: "var(--text-muted)" }}>
+                  Add the courses you are taking so we can match you with classmates.
+                </p>
+              </div>
+            )}
+
+            {courses.map((course, index) => {
+              const errs = fieldErrors[course.uid] ?? {};
+              const isDuplicate = duplicateCodes.has(
+                `${course.code.trim().toLowerCase()}|${course.goal}`
+              );
+              return (
+                <section
+                  key={course.uid}
+                  className="rounded-2xl border p-6 transition hover:shadow-md"
+                  style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-card)" }}
+                  aria-label={`Course ${index + 1}`}
+                >
+                  <div className="mb-5 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold tabular-nums"
+                        style={{
+                          backgroundColor: "var(--brand-soft-bg)",
+                          color: "var(--brand-strong)",
+                        }}
+                      >
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      <h2
+                        className="truncate text-sm font-bold"
+                        style={{ color: "var(--text-heading)" }}
+                      >
+                        {course.name.trim() || "New course"}
+                      </h2>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => removeCourse(course.uid)}
+                      className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition hover:bg-red-500/10"
+                      style={{ color: "#dc2626" }}
+                      aria-label={`Remove course ${index + 1}`}
+                    >
+                      <Icon d={icons.trash} size={14} />
+                      Remove
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-[1fr_200px]">
+                      <label className={labelClass} style={{ color: "var(--text-sub)" }}>
+                        Course name
+                        <input
+                          value={course.name}
+                          onChange={(e) => updateCourse(course.uid, "name", e.target.value)}
+                          placeholder="e.g. Design and Analysis of Algorithms"
+                          className={inputClass}
+                          aria-invalid={Boolean(errs.name)}
+                          style={errs.name ? { borderColor: "#dc2626" } : undefined}
+                        />
+                        {errs.name && (
+                          <span className="mt-1 block text-xs text-red-500">{errs.name}</span>
+                        )}
+                      </label>
+
+                      <label className={labelClass} style={{ color: "var(--text-sub)" }}>
+                        Course code
+                        <input
+                          value={course.code}
+                          onChange={(e) => updateCourse(course.uid, "code", e.target.value)}
+                          placeholder="e.g. CS-GY 6033"
+                          className={inputClass}
+                          aria-invalid={Boolean(errs.code)}
+                          style={errs.code ? { borderColor: "#dc2626" } : undefined}
+                        />
+                        {errs.code && (
+                          <span className="mt-1 block text-xs text-red-500">{errs.code}</span>
+                        )}
+                      </label>
+                    </div>
+
+                    {isDuplicate && (
+                      <p
+                        className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium"
+                        style={{ backgroundColor: "rgba(217,119,6,0.1)", color: "#b45309" }}
+                      >
+                        <Icon d={icons.alert} size={14} />
+                        This course code appears more than once with the same goal.
+                      </p>
+                    )}
+
+                    <fieldset>
+                      <legend
+                        className="text-[13px] font-medium"
+                        style={{ color: "var(--text-sub)" }}
+                      >
+                        Study goal
+                      </legend>
+                      <div
+                        className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5"
+                        role="radiogroup"
+                      >
+                        {goals.map((goal) => {
+                          const active = course.goal === goal.value;
+                          return (
+                            <button
+                              key={goal.value}
+                              type="button"
+                              role="radio"
+                              aria-checked={active}
+                              onClick={() => updateCourse(course.uid, "goal", goal.value)}
+                              className="rounded-xl border px-3 py-2.5 text-left transition hover:opacity-90"
+                              style={{
+                                backgroundColor: active
+                                  ? "var(--brand-soft-bg)"
+                                  : "var(--bg-card-inner)",
+                                borderColor: active ? "var(--brand)" : "var(--border-card)",
+                                color: active ? "var(--brand-strong)" : "var(--text-sub)",
+                              }}
+                            >
+                              <span className="block text-xs font-semibold">{goal.label}</span>
+                              <span className="mt-0.5 block text-[10px] opacity-70">
+                                {goal.hint}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </fieldset>
+
+                    <label
+                      className={`${labelClass} sm:max-w-[220px]`}
+                      style={{ color: "var(--text-sub)" }}
+                    >
+                      Semester
+                      <select
+                        value={course.semester}
+                        onChange={(e) => updateCourse(course.uid, "semester", e.target.value)}
+                        className={inputClass}
+                      >
+                        {semesters.map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+
+          {courses.length < MAX_COURSES && (
+            <button
+              type="button"
+              onClick={addCourse}
+              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed py-4 text-sm font-semibold transition hover:opacity-80"
+              style={{
+                backgroundColor: "var(--bg-card)",
+                borderColor: "var(--brand-soft-border)",
+                color: "var(--brand)",
+              }}
+            >
+              <Icon d={icons.plus} size={15} />
+              Add another course
+            </button>
+          )}
+        </div>
+
+        {/* ---------------------------- Sticky action bar ------------------------- */}
+        <div
+          className="fixed bottom-0 left-64 right-0 z-30 border-t px-8 py-4 backdrop-blur"
+          style={{
+            backgroundColor: "color-mix(in srgb, var(--bg-card) 90%, transparent)",
+            borderColor: "var(--border-card)",
+          }}
+        >
+          <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
+            <p
+              className="flex items-center gap-2 text-xs font-medium"
+              style={{ color: "var(--text-muted)" }}
+              aria-live="polite"
+            >
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: dirty ? "#d97706" : "#16a34a" }}
+                aria-hidden="true"
+              />
+              {dirty ? "You have unsaved changes" : "All changes saved"}
+            </p>
+
+            <div className="flex items-center gap-3">
+              {dirty && (
                 <button
                   type="button"
-                  onClick={() => removeCourse(index)}
-                  className="text-xs font-semibold text-red-500 transition hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                  onClick={resetChanges}
+                  disabled={saving}
+                  className="rounded-xl border px-4 py-2.5 text-sm font-semibold transition hover:opacity-80 disabled:opacity-50"
+                  style={ghostStyle}
                 >
-                  Remove
+                  Discard
                 </button>
-              </div>
-
-              <div className="space-y-4">
-                <label className={labelClass}>
-                  Course name
-                  <input
-                    value={course.name}
-                    onChange={(e) => updateCourse(index, "name", e.target.value)}
-                    placeholder="e.g. Design and Analysis of Algorithms"
-                    className={inputClass}
-                  />
-                </label>
-
-                <label className={labelClass}>
-                  Course code
-                  <input
-                    value={course.code}
-                    onChange={(e) => updateCourse(index, "code", e.target.value)}
-                    placeholder="e.g. CS-GY 6033"
-                    className={inputClass}
-                  />
-                </label>
-
-                <label className={labelClass}>
-                  Study goal
-                  <select
-                    value={course.goal}
-                    onChange={(e) => updateCourse(index, "goal", e.target.value)}
-                    className={inputClass}
-                  >
-                    {goals.map((goal) => (
-                      <option key={goal.value} value={goal.value}>
-                        {goal.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            </section>
-          ))}
-        </div>
-
-        {courses.length < 5 && (
-          <button
-            type="button"
-            onClick={addCourse}
-            className="mt-4 w-full rounded-2xl border border-dashed border-slate-300 bg-white py-4 text-sm font-semibold text-indigo-700 transition hover:border-indigo-400 hover:bg-indigo-50 dark:border-slate-700 dark:bg-[#111119] dark:text-indigo-300 dark:hover:border-indigo-500 dark:hover:bg-indigo-950/30"
-          >
-            + Add another course
-          </button>
-        )}
-
-        {error && (
-          <p
-            role="alert"
-            className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
-          >
-            {error}
-          </p>
-        )}
-
-        {message && (
-          <p
-            role="status"
-            className="mt-5 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300"
-          >
-            {message}
-          </p>
-        )}
-
-        <div className="mt-6 flex justify-end gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-[#111119]">
-          <Link
-            href="/profile"
-            className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-          >
-            Cancel
-          </Link>
-
-          <button
-            type="button"
-            onClick={saveCourses}
-            disabled={saving}
-            className="rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
-          >
-            {saving ? "Saving..." : "Save courses"}
-          </button>
+              )}
+              <Link
+                href="/profile"
+                className="rounded-xl border px-4 py-2.5 text-sm font-semibold transition hover:opacity-80"
+                style={ghostStyle}
+              >
+                {dirty ? "Cancel" : "Back to profile"}
+              </Link>
+              <button
+                type="button"
+                onClick={saveCourses}
+                disabled={saving || !dirty}
+                className="inline-flex items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ backgroundColor: "var(--brand)", color: "var(--brand-fg)" }}
+              >
+                {saving && <Spinner />}
+                {saving ? "Saving…" : "Save courses"}
+              </button>
+            </div>
+          </div>
         </div>
       </main>
     </div>
