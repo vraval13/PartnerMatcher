@@ -136,16 +136,6 @@ export async function findMatches(db: SupabaseClient, request: Request, now = ne
     if (own.error) throw own.error;
     if (!own.data) return reply({ error: "Goal not found." }, 404);
     const query = goal(own.data as DBGoal);
-    if (query.category === "skill_practice")
-      return reply(
-        {
-          error:
-            "Partner search is not available for this learning goal category yet. The goal is saved and ready for future matching support.",
-          code: "UNSUPPORTED_MATCHING_CATEGORY",
-          field_errors: [],
-        },
-        422
-      );
     validateGoal(query, now);
     const candidates = db
       .from("matching_goals")
@@ -154,19 +144,29 @@ export async function findMatches(db: SupabaseClient, request: Request, now = ne
       .is("archived_at", null)
       .neq("user_id", id);
     const exam = query.category === "exam_prep";
-    const fetch = exam
-      ? candidates
-          .eq("category", "exam_prep")
-          .eq("exam_date", query.exam_date!)
-          .eq("subject_or_skill_key", normalized(query.subject_or_skill ?? null))
-      : candidates
-          .eq("mode", query.mode!)
-          .eq("institution_key", normalized(query.institution))
-          .eq("course_key", normalized(query.course_code))
-          .eq(
-            query.mode === "assignment" ? "assignment_id" : "topic_key",
-            query.mode === "assignment" ? query.assignment_id! : normalized(query.topic)
-          );
+    const practice = query.category === "skill_practice";
+    let fetch;
+    if (exam) {
+      fetch = candidates
+        .eq("information_version", 2)
+        .eq("category", "exam_prep")
+        .eq("exam_date", query.exam_date!)
+        .eq("subject_or_skill_key", normalized(query.subject_or_skill));
+    } else if (practice) {
+      fetch = candidates
+        .eq("information_version", 2)
+        .eq("category", "skill_practice")
+        .eq("subject_or_skill_key", normalized(query.subject_or_skill));
+    } else {
+      fetch = candidates
+        .eq("mode", query.mode)
+        .eq("institution_key", normalized(query.institution))
+        .eq("course_key", normalized(query.course_code));
+      fetch =
+        query.mode === "assignment"
+          ? fetch.eq("assignment_id", query.assignment_id!)
+          : fetch.eq("topic_key", normalized(query.topic));
+    }
     // Fetch one over the supported cap; never silently rank an incomplete candidate set.
     const { data, error } = await fetch.order("id").limit(1000);
     if (error) throw error;

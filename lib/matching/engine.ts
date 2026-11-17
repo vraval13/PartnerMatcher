@@ -44,13 +44,14 @@ export type ScoringConfig = {
 };
 // Proposed urgency bands; team approval is still required. Weights follow Sprint 2.
 export const DEFAULT_CONFIG: ScoringConfig = {
-  version: "course-assignment-v1-proposed-urgency",
+  version: "category-aware-v2-proposed-urgency",
   urgency: [
     { within_days: 2, multiplier: 1.2 },
     { within_days: 7, multiplier: 1.1 },
   ],
 };
 export const WEIGHTS = { topic: 0.4, availability: 0.35, location: 0.25 };
+export const PRACTICE_WEIGHTS = { topic: 0.25, availability: 0.5, location: 0.25 };
 export class ValidationError extends Error {}
 export class TimezoneValidationError extends ValidationError {
   readonly code = "INVALID_TIMEZONE";
@@ -67,8 +68,33 @@ export class TimezoneValidationError extends ValidationError {
     this.name = "TimezoneValidationError";
   }
 }
-export function normalized(value: string | null) {
+export function normalized(value: string | null | undefined) {
   return (value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function hasCompatibleScope(query: GoalInput, candidate: GoalInput) {
+  if (
+    query.information_version === 2 &&
+    (query.category === "exam_prep" || query.category === "skill_practice")
+  ) {
+    return (
+      candidate.information_version === 2 &&
+      candidate.category === query.category &&
+      normalized(candidate.subject_or_skill) === normalized(query.subject_or_skill) &&
+      (query.category !== "exam_prep" || candidate.exam_date === query.exam_date)
+    );
+  }
+
+  if (
+    candidate.mode !== query.mode ||
+    normalized(candidate.institution) !== normalized(query.institution) ||
+    normalized(candidate.course_code) !== normalized(query.course_code)
+  )
+    return false;
+
+  return query.mode === "assignment"
+    ? candidate.assignment_id === query.assignment_id
+    : normalized(candidate.topic) === normalized(query.topic);
 }
 function text(value: unknown, name: string, max: number, required = true): string {
   if (typeof value !== "string" || value.length > max || (required && !value.trim()))
@@ -313,7 +339,7 @@ export function rankCandidates(
   )
     throw new ValidationError("Invalid scoring configuration.");
   const exam = query.category === "exam_prep";
-  if (query.category === "skill_practice") return [];
+  const practice = query.category === "skill_practice";
   const start = exam
     ? Math.max(
         asOf.getTime(),
@@ -327,30 +353,13 @@ export function rankCandidates(
   const querySlots = intervals(query, start, Math.min(horizon, deadline(query)));
   const ranked = candidates
     .flatMap((candidate) => {
-      if (candidate.user_id === query.user_id || !candidate.is_listed || candidate.archived_at)
+      if (
+        candidate.user_id === query.user_id ||
+        !candidate.is_listed ||
+        candidate.archived_at ||
+        !hasCompatibleScope(query, candidate)
+      )
         return [];
-      if (exam) {
-        if (
-          candidate.category !== "exam_prep" ||
-          normalized(candidate.subject_or_skill ?? null) !==
-            normalized(query.subject_or_skill ?? null) ||
-          candidate.exam_date !== query.exam_date
-        )
-          return [];
-      } else {
-        if (
-          candidate.mode !== query.mode ||
-          normalized(candidate.institution) !== normalized(query.institution) ||
-          normalized(candidate.course_code) !== normalized(query.course_code)
-        )
-          return [];
-        if (
-          query.mode === "assignment"
-            ? candidate.assignment_id !== query.assignment_id
-            : normalized(candidate.topic) !== normalized(query.topic)
-        )
-          return [];
-      }
       try {
         validateGoal(candidate, asOf);
       } catch {
@@ -362,7 +371,10 @@ export function rankCandidates(
       );
       const overlap = duration(common);
       if (!overlap) return [];
-      const topic = exam || normalized(candidate.topic) === normalized(query.topic) ? 100 : 0;
+      // Candidate eligibility already guarantees an exact course topic, assignment,
+      // exam subject, or practice skill/language match. US-07 gives recurring
+      // availability 50%; the remaining practice score preserves location at 25%.
+      const topic = 100;
       const availability = Math.min(100, (100 * overlap) / duration(querySlots));
       const location =
         query.location_preference === "either" || candidate.location_preference === "either"
@@ -374,10 +386,11 @@ export function rankCandidates(
               ? 100
               : 0;
       const components = { topic, availability: round(availability), location };
+      const weights = practice ? PRACTICE_WEIGHTS : WEIGHTS;
       const contributions = {
-        topic: topic * WEIGHTS.topic,
-        availability: availability * WEIGHTS.availability,
-        location: location * WEIGHTS.location,
+        topic: topic * weights.topic,
+        availability: availability * weights.availability,
+        location: location * weights.location,
       };
       const base_score = round(Object.values(contributions).reduce((a, b) => a + b, 0));
       const dueDate = exam ? query.exam_date : candidate.due_date;
@@ -397,15 +410,18 @@ export function rankCandidates(
           matched_user_id: candidate.user_id,
           candidate_goal_id: candidate.id,
           display_name: candidate.display_name,
+          category: candidate.category,
+          subject_or_skill: candidate.subject_or_skill,
+          proficiency_level: candidate.proficiency_level,
           course_code: candidate.course_code,
-          topic: exam ? (candidate.subject_or_skill ?? null) : candidate.topic,
+          topic: exam || practice ? (candidate.subject_or_skill ?? null) : candidate.topic,
           exam_date: candidate.exam_date ?? null,
           assignment_id: candidate.assignment_id,
           due_date: candidate.due_date,
           location_preference: candidate.location_preference,
           location: candidate.location,
           components,
-          weights: WEIGHTS,
+          weights,
           contributions: {
             ...contributions,
             availability: round(contributions.availability),

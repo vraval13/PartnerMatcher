@@ -15,20 +15,21 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Subset of matching_goals columns needed for eligibility checking. */
 const GOAL_FIELDS =
-  "id,user_id,mode,institution_key,course_key,topic_key,assignment_id,is_listed,archived_at,category,exam_date,subject_or_skill_key";
+  "id,user_id,information_version,category,subject_or_skill_key,exam_date,mode,institution_key,course_key,topic_key,assignment_id,is_listed,archived_at";
 
 // ── types ────────────────────────────────────────────────────────────────────
 
 type GoalRow = {
   id: string;
   user_id: string;
-  mode: string | null;
-  category?: string | null;
+  information_version: number;
+  category: string | null;
+  subject_or_skill_key: string | null;
   exam_date?: string | null;
-  subject_or_skill_key?: string | null;
-  institution_key: string;
-  course_key: string;
-  topic_key: string;
+  mode: string | null;
+  institution_key: string | null;
+  course_key: string | null;
+  topic_key: string | null;
   assignment_id: string | null;
   is_listed: boolean;
   archived_at: string | null;
@@ -142,6 +143,19 @@ async function getAuthUserId(db: SupabaseClient): Promise<string | null> {
   return !error && data.user ? data.user.id : null;
 }
 
+async function isPausedMatchingGoal(
+  db: SupabaseClient,
+  searchGoalId: string,
+  candidateGoalId: string
+) {
+  const { data, error } = await db.rpc("matching_goal_is_paused", {
+    search_goal_id: searchGoalId,
+    candidate_goal_id: candidateGoalId,
+  });
+  if (error) throw error;
+  return data === true;
+}
+
 // ── eligibility ──────────────────────────────────────────────────────────────
 
 /**
@@ -154,10 +168,22 @@ export function isEligibleCandidate(own: GoalRow, candidate: GoalRow | null): bo
   if (candidate.user_id === own.user_id) return false;
   if (own.category === "exam_prep" || candidate.category === "exam_prep") {
     return (
+      own.information_version === 2 &&
+      candidate.information_version === 2 &&
       own.category === "exam_prep" &&
       candidate.category === "exam_prep" &&
       Boolean(own.exam_date) &&
       own.exam_date === candidate.exam_date &&
+      Boolean(own.subject_or_skill_key) &&
+      candidate.subject_or_skill_key === own.subject_or_skill_key
+    );
+  }
+  if (own.category === "skill_practice" || candidate.category === "skill_practice") {
+    return (
+      own.information_version === 2 &&
+      candidate.information_version === 2 &&
+      own.category === "skill_practice" &&
+      candidate.category === "skill_practice" &&
       Boolean(own.subject_or_skill_key) &&
       own.subject_or_skill_key === candidate.subject_or_skill_key
     );
@@ -240,7 +266,8 @@ export async function sendConnectionRequest(
     if (candErr) throw candErr;
 
     if (
-      (ownGoal as GoalRow).category === "exam_prep" &&
+      ((ownGoal as GoalRow).category === "exam_prep" ||
+        (ownGoal as GoalRow).category === "skill_practice") &&
       isEligibleCandidate(ownGoal as GoalRow, candidateGoal as GoalRow | null)
     ) {
       const eligibility = await previewPartner(db, goalId, candidateGoalId);
@@ -249,6 +276,22 @@ export async function sendConnectionRequest(
 
     // AC2: candidate must pass the same eligibility filters as the matching engine
     if (!isEligibleCandidate(ownGoal as GoalRow, candidateGoal as GoalRow | null)) {
+      if (!candidateGoal && (await isPausedMatchingGoal(db, goalId, candidateGoalId))) {
+        return reply(
+          {
+            error:
+              "This student's matching profile is currently unavailable. A new connection request cannot be sent.",
+            code: "MATCHING_PAUSED",
+            field_errors: [
+              {
+                field: "candidate_goal_id",
+                message: "This student is currently unavailable for new connection requests.",
+              },
+            ],
+          },
+          409
+        );
+      }
       return reply(
         {
           error: "Candidate is not in your current results for this goal.",

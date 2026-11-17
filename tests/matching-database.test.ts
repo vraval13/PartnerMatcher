@@ -32,13 +32,22 @@ test("migration: actual Postgres constraints, transaction rollback and RLS permi
   const db = new PGlite();
   try {
     await db.exec(
-      `create role anon; create role authenticated; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; grant usage on schema auth,public to anon,authenticated; grant execute on function auth.uid() to anon,authenticated; insert into auth.users values('${alice}'),('${bob}');`
+      `create role anon; create role authenticated; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; grant usage on schema auth,public to anon,authenticated; grant execute on function auth.uid() to anon,authenticated; insert into auth.users values('${alice}'),('${bob}'); create table public.profiles(user_id uuid primary key references auth.users(id),is_discoverable boolean not null default true); insert into public.profiles(user_id) values('${alice}'),('${bob}'); alter table public.profiles enable row level security; grant select,update on public.profiles to authenticated; create policy profiles_read on public.profiles for select to authenticated using(true); create policy profiles_update on public.profiles for update to authenticated using(user_id=(select auth.uid())) with check(user_id=(select auth.uid()));`
+    );
+    await db.exec(
+      `create table public.connections(id uuid primary key default gen_random_uuid(),requester_id uuid not null references auth.users(id),receiver_id uuid not null references auth.users(id),status text not null); insert into public.connections(requester_id,receiver_id,status) values('${alice}','${bob}','pending'),('${alice}','${bob}','accepted'),('${alice}','${bob}','rejected'),('${alice}','${bob}','cancelled'); alter table public.connections enable row level security; grant select on public.connections to authenticated; create policy connections_read_participants on public.connections for select to authenticated using(requester_id=(select auth.uid()) or receiver_id=(select auth.uid()));`
     );
     const legacyMigration = readdirSync("supabase/migrations").find((f) =>
       f.endsWith("_course_assignment_matching.sql")
     )!;
     const informationMigration = readdirSync("supabase/migrations").find((f) =>
       f.endsWith("_us01_matching_information.sql")
+    )!;
+    const examPauseMigration = readdirSync("supabase/migrations").find((f) =>
+      f.endsWith("_us07_us16_exam_pause.sql")
+    )!;
+    const pauseAuthorizationMigration = readdirSync("supabase/migrations").find((f) =>
+      f.endsWith("_us16_pause_authorization.sql")
     )!;
     await db.exec(readFileSync(`supabase/migrations/${legacyMigration}`, "utf8"));
     await db.exec(`set role authenticated; set request.jwt.claim.sub='${alice}';`);
@@ -52,6 +61,7 @@ test("migration: actual Postgres constraints, transaction rollback and RLS permi
     const legacy = await create(payload);
     await db.exec("reset role");
     await db.exec(readFileSync(`supabase/migrations/${informationMigration}`, "utf8"));
+    await db.exec(readFileSync(`supabase/migrations/${examPauseMigration}`, "utf8"));
     await db.exec(`set role authenticated; set request.jwt.claim.sub='${alice}';`);
     const legacyRow = (
       await db.query<{
@@ -164,6 +174,7 @@ test("migration: actual Postgres constraints, transaction rollback and RLS permi
       f.endsWith("_us06_exam_preparation.sql")
     )!;
     await db.exec(readFileSync(`supabase/migrations/${examMigration}`, "utf8"));
+    await db.exec(readFileSync(`supabase/migrations/${pauseAuthorizationMigration}`, "utf8"));
     await db.exec(`set role authenticated; set request.jwt.claim.sub='${alice}';`);
     await assert.rejects(create(examPayload), /Exam and preparation dates are required/);
     await assert.rejects(
@@ -224,12 +235,33 @@ test("migration: actual Postgres constraints, transaction rollback and RLS permi
       "Database constraints reject unsupported values"
     );
     await db.exec(`set request.jwt.claim.sub='${bob}';`);
+    const bobSearch = await create({ ...payload, display_name: "Bob" });
     assert.equal(
-      (await db.query("select * from public.matching_goals")).rows.length,
+      (await db.query("select * from public.matching_goals where id=$1", [own])).rows.length,
       0,
       "Private goal invisible"
     );
-    assert.equal((await db.query("select * from public.matching_availability")).rows.length, 0);
+    assert.equal(
+      (await db.query("select * from public.matching_availability where goal_id=$1", [own])).rows
+        .length,
+      0
+    );
+    await db.exec(`set request.jwt.claim.sub='${alice}';`);
+    await db.query("update public.profiles set matching_paused=true where user_id=$1", [alice]);
+    await db.exec(`set request.jwt.claim.sub='${bob}';`);
+    assert.equal(
+      (
+        await db.query<{ paused: boolean }>(
+          "select public.matching_goal_is_paused($1,$2) as paused",
+          [bobSearch, own]
+        )
+      ).rows[0].paused,
+      false,
+      "A private goal never reveals its owner's pause status"
+    );
+    await db.exec(`set request.jwt.claim.sub='${alice}';`);
+    await db.query("update public.profiles set matching_paused=false where user_id=$1", [alice]);
+    await db.exec(`set request.jwt.claim.sub='${bob}';`);
     assert.equal(
       (
         await db.query("update public.matching_goals set is_listed=true where id=$1 returning id", [
@@ -269,11 +301,61 @@ test("migration: actual Postgres constraints, transaction rollback and RLS permi
     );
     await db.exec(`set request.jwt.claim.sub='${bob}';`);
     assert.equal(
-      (await db.query("select * from public.matching_goals")).rows.length,
+      (await db.query("select * from public.matching_goals where id=$1", [own])).rows.length,
       1,
       "Listed goal readable by signed-in peer"
     );
-    assert.equal((await db.query("select * from public.matching_availability")).rows.length, 1);
+    assert.equal(
+      (await db.query("select * from public.matching_availability where goal_id=$1", [own])).rows
+        .length,
+      1
+    );
+    await db.exec(`set request.jwt.claim.sub='${alice}';`);
+    await db.query("update public.profiles set matching_paused=true where user_id=$1", [alice]);
+    await db.exec(`set request.jwt.claim.sub='${bob}';`);
+    assert.equal(
+      (await db.query("select * from public.matching_goals where id=$1", [own])).rows.length,
+      0,
+      "Paused owner is hidden from new peer discovery"
+    );
+    assert.equal(
+      (
+        await db.query<{ paused: boolean }>(
+          "select public.matching_goal_is_paused($1,$2) as paused",
+          [bobSearch, own]
+        )
+      ).rows[0].paused,
+      true,
+      "A caller with an eligible older match can receive the unavailable status"
+    );
+    assert.equal(
+      (await db.query("select * from public.matching_availability where goal_id=$1", [own])).rows
+        .length,
+      0,
+      "Paused owner's slots are hidden with the goal"
+    );
+    assert.deepEqual(
+      (
+        await db.query<{ status: string }>(
+          "select status from public.connections order by array_position(array['pending','accepted','rejected','cancelled'],status)"
+        )
+      ).rows.map((row) => row.status),
+      ["pending", "accepted", "rejected", "cancelled"],
+      "Pause retains pending, accepted, declined/rejected, and cancelled requests"
+    );
+    await db.exec(`set request.jwt.claim.sub='${alice}';`);
+    assert.equal(
+      (await db.query("select * from public.matching_goals where id=$1", [own])).rows.length,
+      1,
+      "Pause does not remove the owner's goal"
+    );
+    await db.query("update public.profiles set matching_paused=false where user_id=$1", [alice]);
+    await db.exec(`set request.jwt.claim.sub='${bob}';`);
+    assert.equal(
+      (await db.query("select * from public.matching_goals where id=$1", [own])).rows.length,
+      1,
+      "Resuming restores listed-goal discovery"
+    );
     await db.exec(`set role anon; set request.jwt.claim.sub='';`);
     await assert.rejects(db.query("select * from public.matching_goals"));
     await assert.rejects(
@@ -286,7 +368,7 @@ test("migration: actual Postgres constraints, transaction rollback and RLS permi
     );
     await db.exec(`set request.jwt.claim.sub='${bob}';`);
     assert.equal(
-      (await db.query("select * from public.matching_goals")).rows.length,
+      (await db.query("select * from public.matching_goals where id=$1", [own])).rows.length,
       0,
       "Archived goal hidden"
     );

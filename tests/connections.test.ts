@@ -30,6 +30,10 @@ const connId = "55555555-5555-4555-8555-555555555555";
 const ownGoal = {
   id: goalId,
   user_id: requesterId,
+  information_version: 2,
+  category: "course",
+  subject_or_skill_key: "react hooks",
+  exam_date: null,
   mode: "course",
   institution_key: "nyu",
   course_key: "cs-gy 6233",
@@ -42,6 +46,10 @@ const ownGoal = {
 const candidateGoal = {
   id: candGoalId,
   user_id: receiverId,
+  information_version: 2,
+  category: "course",
+  subject_or_skill_key: "react hooks",
+  exam_date: null,
   mode: "course",
   institution_key: "nyu",
   course_key: "cs-gy 6233",
@@ -96,7 +104,14 @@ function db(lookup: (url: URL, init?: RequestInit) => unknown, signedIn = true) 
 }
 
 /** Happy-path DB: requester's goal → own, candidate's goal → candidate, INSERT → connId. */
-function happyDb(overrides: { own?: unknown; candidate?: unknown; insertResult?: unknown } = {}) {
+function happyDb(
+  overrides: {
+    own?: unknown;
+    candidate?: unknown;
+    insertResult?: unknown;
+    candidatePaused?: boolean;
+  } = {}
+) {
   return db((url, init) => {
     // INSERT into connections — match by path to avoid catching auth POSTs
     if (init?.method === "POST" && url.pathname === "/rest/v1/connections") {
@@ -110,6 +125,12 @@ function happyDb(overrides: { own?: unknown; candidate?: unknown; insertResult?:
     if (url.pathname === "/rest/v1/matching_goals" && url.searchParams.has("is_listed")) {
       // candidate's goal lookup
       return overrides.candidate !== undefined ? overrides.candidate : candidateGoal;
+    }
+    if (url.pathname === "/rest/v1/rpc/matching_goal_is_paused") {
+      const body = JSON.parse(String(init?.body));
+      assert.equal(body.search_goal_id, goalId);
+      assert.equal(body.candidate_goal_id, candGoalId);
+      return overrides.candidatePaused ?? false;
     }
     return null; // safe default for unexpected SDK fetches (auth checks, etc.)
   });
@@ -177,6 +198,62 @@ test("US-08 AC2: isEligibleCandidate uses assignment_id equality for assignment 
   };
   assert.equal(isEligibleCandidate(assignOwn, assignCand), true);
   assert.equal(isEligibleCandidate(assignOwn, { ...assignCand, assignment_id: "HW-02" }), false);
+});
+test("US-06/US-08: an exact exam-subject match remains eligible for a connection request", () => {
+  const examOwn = {
+    ...ownGoal,
+    category: "exam_prep",
+    subject_or_skill_key: "calculus final",
+    exam_date: "2026-12-15",
+    mode: null,
+    institution_key: null,
+    course_key: null,
+    topic_key: null,
+  };
+  const examCandidate = {
+    ...candidateGoal,
+    category: "exam_prep",
+    subject_or_skill_key: "calculus final",
+    exam_date: "2026-12-15",
+    mode: null,
+    institution_key: null,
+    course_key: null,
+    topic_key: null,
+  };
+  assert.equal(isEligibleCandidate(examOwn, examCandidate), true);
+  assert.equal(
+    isEligibleCandidate(examOwn, { ...examCandidate, subject_or_skill_key: "physics final" }),
+    false
+  );
+  assert.equal(isEligibleCandidate(examOwn, { ...examCandidate, exam_date: "2026-12-16" }), false);
+});
+test("US-07/US-08: an exact skill or language match remains eligible for a request", () => {
+  const practiceOwn = {
+    ...ownGoal,
+    category: "skill_practice",
+    subject_or_skill_key: "japanese conversation",
+    mode: null,
+    institution_key: null,
+    course_key: null,
+    topic_key: null,
+  };
+  const practiceCandidate = {
+    ...candidateGoal,
+    category: "skill_practice",
+    subject_or_skill_key: "japanese conversation",
+    mode: null,
+    institution_key: null,
+    course_key: null,
+    topic_key: null,
+  };
+  assert.equal(isEligibleCandidate(practiceOwn, practiceCandidate), true);
+  assert.equal(
+    isEligibleCandidate(practiceOwn, {
+      ...practiceCandidate,
+      subject_or_skill_key: "spanish conversation",
+    }),
+    false
+  );
 });
 
 // ── HTTP handler tests ────────────────────────────────────────────────────────
@@ -330,6 +407,35 @@ test("US-08 AC2: candidate not found (not listed/archived) returns 422 — not i
   const res = await sendConnectionRequest(happyDb({ candidate: null }), request(validBody));
   assert.equal(res.status, 422);
   assert.equal((await res.json()).code, "CANDIDATE_NOT_IN_RESULTS");
+});
+
+test("US-16 AC3: an old result for a paused profile explains unavailability and blocks request", async () => {
+  let insertAttempted = false;
+  const client = db((url, init) => {
+    if (init?.method === "POST" && url.pathname === "/rest/v1/connections") {
+      insertAttempted = true;
+      return { id: connId };
+    }
+    if (url.pathname === "/rest/v1/matching_goals" && url.searchParams.has("user_id")) {
+      return ownGoal;
+    }
+    if (url.pathname === "/rest/v1/matching_goals" && url.searchParams.has("is_listed")) {
+      return null;
+    }
+    if (url.pathname === "/rest/v1/rpc/matching_goal_is_paused") {
+      const body = JSON.parse(String(init?.body));
+      assert.deepEqual(body, { search_goal_id: goalId, candidate_goal_id: candGoalId });
+      return true;
+    }
+    return null;
+  });
+
+  const response = await sendConnectionRequest(client, request(validBody));
+  assert.equal(response.status, 409);
+  const body = await response.json();
+  assert.equal(body.code, "MATCHING_PAUSED");
+  assert.match(body.error, /currently unavailable/i);
+  assert.equal(insertAttempted, false);
 });
 
 test("US-08 AC2: candidate with different topic returns 422 — not in results", async () => {
