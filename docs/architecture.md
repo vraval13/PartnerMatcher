@@ -70,11 +70,34 @@ frontend/
     │   └── OnboardingClient.tsx   Typeform wizard: 7-step one-at-a-time flow       ✅ Sprint 4
     │
     ├── dashboard/
-    │   ├── page.tsx               Server: auth check                       ✅ Sprint 4
-    │   └── DashboardClient.tsx    Dashboard UI (match feed planned)        ✅ Sprint 4
+    │   ├── page.tsx               Server: auth check                       ✅ Sprint 2
+    │   ├── DashboardClient.tsx    Dynamic dashboard with right sidebar      ✅ Sprint 3
+    │   ├── Sidebar.tsx            Shared left nav — logo, nav, bottom section ✅ Sprint 4
+    │   └── RightSidebar.tsx       Dashboard-only calendar + profile panel   ✅ Sprint 3
+    │
+    ├── partners/
+    │   ├── page.tsx               Server: auth check                       ✅ Sprint 3
+    │   ├── PartnersClient.tsx     Goal form, search, match cards, modal     ✅ Sprint 3
+    │   └── profile/[goalId]/      Partner profile preview page              ✅ Sprint 3
+    │
+    ├── requests/
+    │   ├── page.tsx               Server: auth check                       ✅ Sprint 3
+    │   └── RequestsClient.tsx     Received/sent tabs, filter, actions       ✅ Sprint 3
+    │
+    ├── availability/
+    │   ├── page.tsx               Server: auth check                       ✅ Sprint 3
+    │   └── AvailabilityClient.tsx Weekly slot manager                      ✅ Sprint 3
+    │
+    ├── profile/
+    │   ├── page.tsx               Server: auth check                       ✅ Sprint 3
+    │   ├── ProfileClient.tsx      4-section editor + sidebar card           ✅ Sprint 3
+    │   └── courses/
+    │       ├── page.tsx
+    │       └── CoursesClient.tsx  Course CRUD with per-field validation     ✅ Sprint 3
     │
     └── components/
-        ├── Navbar.tsx             Floating pill navbar (server)
+        ├── Navbar.tsx             Floating pill navbar (landing page only)
+        ├── PageLayout.tsx         Sidebar + main wrapper (shared)
         ├── ThemeProvider.tsx      Context + localStorage + .dark toggle (client)
         ├── ThemeToggle.tsx        Sun/moon button (client)
         └── ScrollAnimations.tsx  IntersectionObserver reveals (client)
@@ -84,13 +107,19 @@ frontend/
 
 ## 4. Routing & access control
 
-| Route         | Auth required | Onboarded required | Behaviour if condition fails                          |
-| ------------- | ------------- | ------------------ | ----------------------------------------------------- |
-| `/`           | No            | No                 | —                                                     |
-| `/signup`     | No            | No                 | Onboarded users → `/dashboard`                        |
-| `/signin`     | No            | No                 | Onboarded users → `/dashboard`                        |
-| `/onboarding` | Yes           | No                 | No user → `/signin`; already onboarded → `/dashboard` |
-| `/dashboard`  | Yes           | Yes                | No user → `/signin`; not onboarded → `/onboarding`    |
+| Route                        | Auth required | Onboarded required | Behaviour if condition fails                          |
+| ---------------------------- | ------------- | ------------------ | ----------------------------------------------------- |
+| `/`                          | No            | No                 | —                                                     |
+| `/signup`                    | No            | No                 | Onboarded users → `/dashboard`                        |
+| `/signin`                    | No            | No                 | Onboarded users → `/dashboard`                        |
+| `/onboarding`                | Yes           | No                 | No user → `/signin`; already onboarded → `/dashboard` |
+| `/dashboard`                 | Yes           | Yes                | No user → `/signin`; not onboarded → `/onboarding`    |
+| `/partners`                  | Yes           | Yes                | No user → `/signin`; not onboarded → `/onboarding`    |
+| `/partners/profile/[goalId]` | Yes           | Yes                | No user → `/signin`                                   |
+| `/requests`                  | Yes           | Yes                | No user → `/signin`; not onboarded → `/onboarding`    |
+| `/profile`                   | Yes           | Yes                | No user → `/signin`; not onboarded → `/onboarding`    |
+| `/profile/courses`           | Yes           | Yes                | No user → `/signin`; not onboarded → `/onboarding`    |
+| `/availability`              | Yes           | Yes                | No user → `/signin`; not onboarded → `/onboarding`    |
 
 Guard implementation: `middleware.ts` reads `profiles.onboarded_at` on every request to `/dashboard`, `/onboarding`, `/signin`, `/signup`. This is a single indexed DB read per navigation.
 
@@ -149,7 +178,7 @@ All colours are CSS custom properties so dark mode works without Tailwind's `dar
 
 ```
 globals.css
-  :root { ... }      ~30 light tokens
+  :root { ... }      ~35 light tokens
   .dark { ... }      same names, dark values
   @keyframes { ... } all animations in one place
   .slide-in-right / .slide-in-left   onboarding animation
@@ -157,6 +186,33 @@ globals.css
 ```
 
 `ThemeProvider` toggles `.dark` on `<html>` and every `var(--token)` follows.
+
+### Brand token set (Sprint 4)
+
+Five tokens replace every hardcoded indigo reference in the authenticated app shell:
+
+| Token                 | Light                  | Dark                   | Usage                               |
+| --------------------- | ---------------------- | ---------------------- | ----------------------------------- |
+| `--brand`             | `#0d9488`              | `#2dd4bf`              | Buttons, accents, active indicators |
+| `--brand-strong`      | `#0f766e`              | `#5eead4`              | Hover / emphasis state              |
+| `--brand-fg`          | `#ffffff`              | `#04201d`              | Text on brand-colored surfaces      |
+| `--brand-soft-bg`     | `rgba(13,148,136,.1)`  | `rgba(45,212,191,.12)` | Chip / badge backgrounds            |
+| `--brand-soft-border` | `rgba(13,148,136,.32)` | `rgba(45,212,191,.3)`  | Info banner borders                 |
+
+### Sidebar layout (Sprint 4)
+
+`app/dashboard/Sidebar.tsx` is shared by all five authenticated pages:
+
+```
+<aside class="flex flex-col h-screen">
+  ├── <div class="flex-1 overflow-y-auto">   ← Logo + nav (scrolls if needed)
+  │     Logo (rainbow arc SVG + wordmark)
+  │     <nav> … nav items …
+  └── <div class="shrink-0 border-t">        ← Always visible bottom section
+        Profile row  (initials chip + name + "View profile")
+        Theme toggle (sun / moon icon)
+        Sign out
+```
 
 ---
 
@@ -188,4 +244,4 @@ Details and environment variables: `deployment.md`.
 
 ---
 
-_Last updated: 2026-11-01 (Sprint 4 — US-22 Registration/Login + US-23 Onboarding complete)._
+_Last updated: 2026-11-17 (Sprint 4 — UI redesign, teal brand system, Sidebar bottom section complete)._
