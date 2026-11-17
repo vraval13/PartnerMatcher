@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
+import { useTheme } from "@/app/components/ThemeProvider";
 
 function Icon({ name, size = 20 }: { name: string; size?: number }) {
   const common = {
@@ -61,6 +62,19 @@ function Icon({ name, size = 20 }: { name: string; size?: number }) {
           <line x1="21" y1="12" x2="9" y2="12" />
         </svg>
       );
+    case "sun":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 3v2M12 19v2M4.22 4.22l1.42 1.42m11.3 11.3 1.42 1.42M3 12h2m16 0h2M4.22 19.78l1.42-1.42m11.3-11.3 1.42-1.42" />
+        </svg>
+      );
+    case "moon":
+      return (
+        <svg {...common}>
+          <path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6.5 6.5 0 0 0 8.268 8.268c.344-.215.825-.003.803.401" />
+        </svg>
+      );
     default:
       return null;
   }
@@ -68,99 +82,159 @@ function Icon({ name, size = 20 }: { name: string; size?: number }) {
 
 export function Sidebar({ user, onSignOut }: { user: User; onSignOut: () => void }) {
   const pathname = usePathname();
+  const { theme, toggle } = useTheme();
 
   const navigationItems = [
     { label: "Dashboard", href: "/dashboard", icon: "home" },
     { label: "Study Partners", href: "/partners", icon: "users" },
     { label: "Requests", href: "/requests", icon: "inbox" },
     { label: "My Courses", href: "/profile/courses", icon: "book" },
-    { label: "Settings", href: "/profile", icon: "settings" },
   ];
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
+  const displayName = String(
+    user.user_metadata?.full_name ??
+      user.user_metadata?.name ??
+      user.email?.split("@")[0] ??
+      "Student"
+  );
+
+  const initials = displayName
+    .split(/\s+/)
+    .map((p) => p[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
   return (
     <aside
-      className="fixed left-0 top-0 h-screen w-64 border-r p-6 overflow-y-auto"
+      className="fixed left-0 top-0 h-screen w-64 border-r flex flex-col"
       style={{
         backgroundColor: "var(--bg-card)",
         borderColor: "var(--border-card)",
       }}
     >
-      {/* Logo */}
-      <Link href="/" className="mb-8 flex items-center gap-2.5 flex-shrink-0 ml-3">
-        <svg
-          width="26"
-          height="22"
-          viewBox="0 0 26 22"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          aria-hidden="true"
-        >
-          <path
-            d="M1 17C1 9.268 6.373 3 13 3C19.627 3 25 9.268 25 17"
-            stroke="#6366f1"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-          />
-          <path
-            d="M5 17C5 11.477 8.582 7 13 7C17.418 7 21 11.477 21 17"
-            stroke="#6366f1"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            opacity="0.65"
-          />
-          <path
-            d="M9 17C9 13.686 10.791 11 13 11C15.209 11 17 13.686 17 17"
-            stroke="#6366f1"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            opacity="0.35"
-          />
-        </svg>
-        <span
-          className="text-[16px] font-bold tracking-tight"
-          style={{ color: "var(--text-heading)" }}
-        >
-          Partner<span className="text-indigo-500">Matcher</span>
-        </span>
-      </Link>
+      {/* ── Top: Logo + Nav ── */}
+      <div className="flex-1 overflow-y-auto px-4 py-6">
+        {/* Logo */}
+        <Link href="/" className="mb-8 flex items-center gap-2.5 flex-shrink-0 ml-1">
+          <svg
+            width="26"
+            height="22"
+            viewBox="0 0 26 22"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            <path
+              d="M1 17C1 9.268 6.373 3 13 3C19.627 3 25 9.268 25 17"
+              stroke="var(--brand)"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            />
+            <path
+              d="M5 17C5 11.477 8.582 7 13 7C17.418 7 21 11.477 21 17"
+              stroke="var(--brand)"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              opacity="0.65"
+            />
+            <path
+              d="M9 17C9 13.686 10.791 11 13 11C15.209 11 17 13.686 17 17"
+              stroke="var(--brand)"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              opacity="0.35"
+            />
+          </svg>
+          <span
+            className="text-[16px] font-bold tracking-tight"
+            style={{ color: "var(--text-heading)" }}
+          >
+            Partner<span style={{ color: "var(--brand)" }}>Matcher</span>
+          </span>
+        </Link>
 
-      {/* Navigation */}
-      <nav className="space-y-2 mb-8">
-        {navigationItems.map((item) => {
-          const active = isActive(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors"
-              style={{
-                backgroundColor: active ? "var(--bg-hover)" : "transparent",
-                color: active ? "var(--text-heading)" : "var(--text-muted)",
-              }}
-            >
-              <Icon name={item.icon} size={18} />
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
+        {/* Navigation */}
+        <nav className="space-y-1">
+          {navigationItems.map((item) => {
+            const active = isActive(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: active ? "var(--bg-hover)" : "transparent",
+                  color: active ? "var(--text-heading)" : "var(--text-muted)",
+                }}
+              >
+                <Icon name={item.icon} size={18} />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
 
-      {/* Divider */}
-      <div className="mb-6 h-px" style={{ backgroundColor: "var(--border-card)" }} />
-
-      {/* Sign out */}
-      <button
-        onClick={onSignOut}
-        className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors"
-        style={{
-          color: "var(--text-muted)",
-        }}
+      {/* ── Bottom: Profile · Theme · Sign out ── */}
+      <div
+        className="shrink-0 border-t px-4 py-4 space-y-1"
+        style={{ borderColor: "var(--border-card)" }}
       >
-        <Icon name="logout" size={18} />
-        Sign out
-      </button>
+        {/* Profile row */}
+        <Link
+          href="/profile"
+          className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors"
+          style={{
+            backgroundColor: isActive("/profile") ? "var(--bg-hover)" : "transparent",
+            color: isActive("/profile") ? "var(--text-heading)" : "var(--text-muted)",
+          }}
+        >
+          <div
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold"
+            style={{ backgroundColor: "var(--brand-soft-bg)", color: "var(--brand-strong)" }}
+          >
+            {initials}
+          </div>
+          <div className="min-w-0">
+            <p
+              className="truncate text-sm font-semibold leading-tight"
+              style={{ color: "var(--text-heading)" }}
+            >
+              {displayName}
+            </p>
+            <p
+              className="truncate text-xs leading-tight mt-0.5"
+              style={{ color: "var(--text-muted)" }}
+            >
+              View profile
+            </p>
+          </div>
+        </Link>
+
+        {/* Theme toggle */}
+        <button
+          onClick={toggle}
+          aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors"
+          style={{ color: "var(--text-muted)" }}
+        >
+          <Icon name={theme === "light" ? "moon" : "sun"} size={18} />
+          {theme === "light" ? "Dark mode" : "Light mode"}
+        </button>
+
+        {/* Sign out */}
+        <button
+          onClick={onSignOut}
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors"
+          style={{ color: "var(--text-muted)" }}
+        >
+          <Icon name="logout" size={18} />
+          Sign out
+        </button>
+      </div>
     </aside>
   );
 }
