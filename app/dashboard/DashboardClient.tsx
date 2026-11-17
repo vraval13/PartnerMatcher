@@ -57,20 +57,10 @@ type Favorite = {
   created_at?: string;
 };
 
-const yearLabels = [
-  "1st year",
-  "2nd year",
-  "3rd year",
-  "4th year",
-  "5th year",
-  "Graduate",
-  "PhD",
-];
+const yearLabels = ["1st year", "2nd year", "3rd year", "4th year", "5th year", "Graduate", "PhD"];
 
 const readable = (value: string | null | undefined) =>
-  value
-    ? value.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase())
-    : "Not set";
+  value ? value.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase()) : "Not set";
 
 function Icon({ name, size = 20 }: { name: string; size?: number }) {
   const common = {
@@ -269,20 +259,12 @@ export function DashboardClient({
       const allMatches = results.flat();
 
       const uniqueMatches = Array.from(
-        new Map(
-          allMatches.map((match) => [match.candidate_goal_id, match])
-        ).values()
+        new Map(allMatches.map((match) => [match.candidate_goal_id, match])).values()
       );
 
-      setMatches(
-        uniqueMatches
-          .sort((a, b) => b.final_score - a.final_score)
-          .slice(0, 5)
-      );
+      setMatches(uniqueMatches.sort((a, b) => b.final_score - a.final_score).slice(0, 5));
     } catch (error) {
-      setMatchesError(
-        error instanceof Error ? error.message : "Unable to load matches."
-      );
+      setMatchesError(error instanceof Error ? error.message : "Unable to load matches.");
     } finally {
       setMatchesLoading(false);
     }
@@ -302,9 +284,7 @@ export function DashboardClient({
       const data = await response.json();
       setFavorites(data.favorites ?? []);
     } catch (error) {
-      setFavoritesError(
-        error instanceof Error ? error.message : "Unable to load favorites."
-      );
+      setFavoritesError(error instanceof Error ? error.message : "Unable to load favorites.");
     } finally {
       setFavoritesLoading(false);
     }
@@ -370,9 +350,7 @@ export function DashboardClient({
   }
 
   const profileIncomplete =
-    !profile?.university?.trim() ||
-    !profile?.major?.trim() ||
-    !profile?.year_of_study;
+    !profile?.university?.trim() || !profile?.major?.trim() || !profile?.year_of_study;
 
   const availabilityIncomplete = availabilityCount === 0;
 
@@ -452,7 +430,10 @@ export function DashboardClient({
 
       <main className="mx-auto max-w-7xl px-5 py-9 sm:px-8 sm:py-12">
         <section className="mb-8">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em]" style={secondaryText}>
+          <p
+            className="mb-2 text-xs font-semibold uppercase tracking-[0.16em]"
+            style={secondaryText}
+          >
             Student workspace
           </p>
 
@@ -539,7 +520,7 @@ export function DashboardClient({
             {
               title: "Study level",
               value: profile?.year_of_study
-                ? yearLabels[profile.year_of_study - 1] ?? "Not set"
+                ? (yearLabels[profile.year_of_study - 1] ?? "Not set")
                 : "Not set",
               link: "/profile",
               action: profile?.major || "Programme not set",
@@ -582,7 +563,11 @@ export function DashboardClient({
               <h2 className="text-base font-bold" style={{ color: "var(--text-heading)" }}>
                 Your academic profile
               </h2>
-              <Link href="/profile" className="text-xs font-semibold" style={{ color: "var(--text-sub)" }}>
+              <Link
+                href="/profile"
+                className="text-xs font-semibold"
+                style={{ color: "var(--text-sub)" }}
+              >
                 Edit →
               </Link>
             </div>
@@ -608,7 +593,7 @@ export function DashboardClient({
                 [
                   "Year",
                   profile?.year_of_study
-                    ? yearLabels[profile.year_of_study - 1] ?? "Not set"
+                    ? (yearLabels[profile.year_of_study - 1] ?? "Not set")
                     : "Not set",
                 ],
                 ["Study style", readable(profile?.study_style)],
@@ -623,7 +608,10 @@ export function DashboardClient({
                   <span className="text-xs" style={secondaryText}>
                     {label}
                   </span>
-                  <span className="max-w-[60%] text-right text-xs font-semibold" style={{ color: "var(--text-sub)" }}>
+                  <span
+                    className="max-w-[60%] text-right text-xs font-semibold"
+                    style={{ color: "var(--text-sub)" }}
+                  >
                     {value}
                   </span>
                 </div>
@@ -633,77 +621,80 @@ export function DashboardClient({
 
           {/* Top matches */}
           {!needsSetup && (
-          <div className="rounded-2xl border p-6" style={cardStyle}>
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-bold" style={{ color: "var(--text-heading)" }}>
-                  Top study partners
-                </h2>
-                <p className="mt-1 text-xs" style={secondaryText}>
-                  Your highest-scoring matches
-                </p>
+            <div className="rounded-2xl border p-6" style={cardStyle}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-bold" style={{ color: "var(--text-heading)" }}>
+                    Top study partners
+                  </h2>
+                  <p className="mt-1 text-xs" style={secondaryText}>
+                    Your highest-scoring matches
+                  </p>
+                </div>
+                <Icon name="users" />
               </div>
-              <Icon name="users" />
-            </div>
 
-            {matchesLoading ? (
-              <p className="py-12 text-center text-sm" style={secondaryText}>
-                Loading your matches…
-              </p>
-            ) : matchesError ? (
-              <div className="py-10 text-center">
-                <p className="text-sm" style={{ color: "#dc2626" }}>
-                  {matchesError}
+              {matchesLoading ? (
+                <p className="py-12 text-center text-sm" style={secondaryText}>
+                  Loading your matches…
                 </p>
-                <button
-                  onClick={() => void loadMatches()}
-                  className="mt-3 rounded-lg border px-4 py-2 text-xs font-semibold"
-                  style={cardStyle}
-                >
-                  Retry
-                </button>
-              </div>
-            ) : matches.length === 0 ? (
-              <div className="py-10 text-center">
-                <p className="text-sm font-semibold" style={{ color: "var(--text-heading)" }}>
-                  No matches yet
-                </p>
-                <p className="mt-2 text-xs" style={secondaryText}>
-                  Add a matching goal and availability to discover study partners.
-                </p>
-                <Link
-                  href="/partners"
-                  className="mt-4 inline-block rounded-xl border px-4 py-2 text-xs font-semibold"
-                  style={cardStyle}
-                >
-                  Find partners →
-                </Link>
-              </div>
-            ) : (
-              <div className="mt-5 space-y-3">
-                {matches.map((match) => (
-                  <Link
-                    key={match.candidate_goal_id}
-                    href={`/partners/profile/${match.candidate_goal_id}`}
-                    className="flex items-center justify-between gap-3 rounded-xl border p-4 transition hover:opacity-75"
+              ) : matchesError ? (
+                <div className="py-10 text-center">
+                  <p className="text-sm" style={{ color: "#dc2626" }}>
+                    {matchesError}
+                  </p>
+                  <button
+                    onClick={() => void loadMatches()}
+                    className="mt-3 rounded-lg border px-4 py-2 text-xs font-semibold"
                     style={cardStyle}
                   >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold" style={{ color: "var(--text-heading)" }}>
-                        {match.display_name}
-                      </p>
-                      <p className="mt-1 text-xs" style={secondaryText}>
-                        View partner profile →
-                      </p>
-                    </div>
-                    <span className="shrink-0 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
-                      {Math.round(match.final_score)}% match
-                    </span>
+                    Retry
+                  </button>
+                </div>
+              ) : matches.length === 0 ? (
+                <div className="py-10 text-center">
+                  <p className="text-sm font-semibold" style={{ color: "var(--text-heading)" }}>
+                    No matches yet
+                  </p>
+                  <p className="mt-2 text-xs" style={secondaryText}>
+                    Add a matching goal and availability to discover study partners.
+                  </p>
+                  <Link
+                    href="/partners"
+                    className="mt-4 inline-block rounded-xl border px-4 py-2 text-xs font-semibold"
+                    style={cardStyle}
+                  >
+                    Find partners →
                   </Link>
-                ))}
-              </div>
-            )}
-          </div>
+                </div>
+              ) : (
+                <div className="mt-5 space-y-3">
+                  {matches.map((match) => (
+                    <Link
+                      key={match.candidate_goal_id}
+                      href={`/partners/profile/${match.candidate_goal_id}`}
+                      className="flex items-center justify-between gap-3 rounded-xl border p-4 transition hover:opacity-75"
+                      style={cardStyle}
+                    >
+                      <div className="min-w-0">
+                        <p
+                          className="truncate text-sm font-semibold"
+                          style={{ color: "var(--text-heading)" }}
+                        >
+                          {match.display_name}
+                        </p>
+                        <p className="mt-1 text-xs" style={secondaryText}>
+                          View partner profile →
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
+                        {Math.round(match.final_score)}% match
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           {/* Favorites */}
@@ -756,7 +747,10 @@ export function DashboardClient({
                     className="flex items-center justify-between gap-3 rounded-xl border p-4"
                     style={cardStyle}
                   >
-                    <p className="truncate text-sm font-semibold" style={{ color: "var(--text-heading)" }}>
+                    <p
+                      className="truncate text-sm font-semibold"
+                      style={{ color: "var(--text-heading)" }}
+                    >
                       {favorite.display_name}
                     </p>
                     {favorite.candidate_goal_ids[0] ? (
@@ -791,7 +785,11 @@ export function DashboardClient({
                   </span>
                 )}
               </div>
-              <Link href="/requests" className="text-xs font-semibold" style={{ color: "var(--text-sub)" }}>
+              <Link
+                href="/requests"
+                className="text-xs font-semibold"
+                style={{ color: "var(--text-sub)" }}
+              >
                 View all →
               </Link>
             </div>
@@ -841,7 +839,11 @@ export function DashboardClient({
               <h2 className="text-base font-bold" style={{ color: "var(--text-heading)" }}>
                 Awaiting Response
               </h2>
-              <Link href="/requests#sent" className="text-xs font-semibold" style={{ color: "var(--text-sub)" }}>
+              <Link
+                href="/requests#sent"
+                className="text-xs font-semibold"
+                style={{ color: "var(--text-sub)" }}
+              >
                 View sent →
               </Link>
             </div>
@@ -853,7 +855,11 @@ export function DashboardClient({
             ) : (
               <div className="mt-5 space-y-3">
                 {visibleSent.map((request) => (
-                  <div key={request.id} className="flex items-center justify-between gap-3 rounded-xl border p-4" style={cardStyle}>
+                  <div
+                    key={request.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border p-4"
+                    style={cardStyle}
+                  >
                     <p className="text-sm font-semibold" style={{ color: "var(--text-heading)" }}>
                       {request.session_topic || "Study session"}
                     </p>
