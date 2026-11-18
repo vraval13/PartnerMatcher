@@ -450,7 +450,8 @@ const CONNECTIONS = [
     session_topic: "Algorithms exam prep",
     proposed_start: "2026-11-19T23:30:00Z",
     proposed_end: "2026-11-20T01:00:00Z",
-    message: "Saw we're both prepping for the algorithms final — want to run through practice problems?",
+    message:
+      "Saw we're both prepping for the algorithms final — want to run through practice problems?",
   },
   {
     from: "daniel",
