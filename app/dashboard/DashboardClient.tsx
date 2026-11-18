@@ -453,6 +453,44 @@ export function DashboardClient({
             </div>
           </section>
 
+          {/* Quick Actions */}
+          <section className="mb-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Link
+              href="/partners"
+              className="flex items-center gap-4 rounded-2xl border p-5 transition hover:opacity-85"
+              style={cardStyle}
+            >
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200">
+                <Icon name="users" size={20} />
+              </div>
+              <div>
+                <p className="text-sm font-bold" style={{ color: "var(--text-heading)" }}>
+                  Find Study Partners
+                </p>
+                <p className="text-xs" style={secondaryText}>
+                  Search goals and see ranked matches
+                </p>
+              </div>
+            </Link>
+            <Link
+              href="/availability"
+              className="flex items-center gap-4 rounded-2xl border p-5 transition hover:opacity-85"
+              style={cardStyle}
+            >
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200">
+                <Icon name="clock" size={20} />
+              </div>
+              <div>
+                <p className="text-sm font-bold" style={{ color: "var(--text-heading)" }}>
+                  Manage Availability
+                </p>
+                <p className="text-xs" style={secondaryText}>
+                  Update your weekly time slots
+                </p>
+              </div>
+            </Link>
+          </section>
+
           {/* My Matching Goals / Study Plans */}
           <section className="mb-10">
             <div className="mb-6">
