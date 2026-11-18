@@ -47,6 +47,13 @@ function Icon({ name, size = 20 }: { name: string; size?: number }) {
           <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
         </svg>
       );
+    case "clock":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3 2" />
+        </svg>
+      );
     case "settings":
       return (
         <svg {...common}>
@@ -87,6 +94,7 @@ export function Sidebar({ user, onSignOut }: { user: User; onSignOut: () => void
   const navigationItems = [
     { label: "Dashboard", href: "/dashboard", icon: "home" },
     { label: "Study Partners", href: "/partners", icon: "users" },
+    { label: "Availability", href: "/availability", icon: "clock" },
     { label: "Requests", href: "/requests", icon: "inbox" },
     { label: "My Courses", href: "/profile/courses", icon: "book" },
   ];

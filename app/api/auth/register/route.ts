@@ -39,7 +39,11 @@ export async function processRegister(
 }
 
 export async function POST(request: Request) {
-  if (process.env.NODE_ENV === "production") {
+  // Gated on the same flag the signup page reads client-side (NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRM),
+  // not NODE_ENV — a deployed build is still "production" even when this instance intentionally
+  // skips email confirmation, and the old NODE_ENV check made this route 404 whenever that happened,
+  // breaking sign-up with "Something went wrong."
+  if (process.env.NEXT_PUBLIC_REQUIRE_EMAIL_CONFIRM !== "false") {
     return NextResponse.json({ error: "Not available." }, { status: 404 });
   }
   try {
