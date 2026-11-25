@@ -5,17 +5,17 @@
  * AC2: accepted/rejected/blocked/already-cancelled → 409 NOT_CANCELLABLE.
  * AC3: only the original sender can cancel (other users' requests return 404).
  *
- * Also covers getSentRequests (GET /api/v1/connections/sent).
+ * getSentRequests (GET /api/v1/connections/sent) is covered by its own story,
+ * US-10 — see tests/connections-sent.test.ts.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createClient } from "@supabase/supabase-js";
-import { cancelConnectionRequest, getSentRequests } from "../lib/connections/http";
+import { cancelConnectionRequest } from "../lib/connections/http";
 
 // ── fixed ids ─────────────────────────────────────────────────────────────────
 
 const requesterId = "11111111-1111-4111-8111-111111111111";
-const receiverId = "22222222-2222-4222-8222-222222222222";
 const connId = "55555555-5555-4555-8555-555555555555";
 const otherConnId = "66666666-6666-4666-8666-666666666666";
 
@@ -170,100 +170,4 @@ test("US-12: response Cache-Control is private, no-store", async () => {
 test("US-12: DB error returns 503", async () => {
   const res = await cancelConnectionRequest(cancelDb({ dbError: true }), connId);
   assert.equal(res.status, 503);
-});
-
-// ── getSentRequests ───────────────────────────────────────────────────────────
-
-const sentRow = {
-  id: connId,
-  receiver_id: receiverId,
-  session_topic: "React Hooks deep dive",
-  proposed_start: "2026-11-15T14:00:00.000Z",
-  proposed_end: "2026-11-15T16:00:00.000Z",
-  message: "Hey, want to study together?",
-  status: "pending",
-  created_at: "2026-11-11T10:00:00.000Z",
-};
-
-function sentDb(overrides: { connections?: unknown; goals?: unknown; error?: boolean } = {}) {
-  return db((url) => {
-    if (url.pathname === "/rest/v1/connections" && url.searchParams.has("requester_id")) {
-      if (overrides.error) {
-        return new Response(JSON.stringify({ code: "PGRST301", message: "db error" }), {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-      return overrides.connections !== undefined ? overrides.connections : [sentRow];
-    }
-    if (
-      url.pathname === "/rest/v1/matching_goals" &&
-      url.searchParams.get("user_id")?.startsWith("in.")
-    ) {
-      return overrides.goals !== undefined
-        ? overrides.goals
-        : [{ user_id: receiverId, display_name: "Sam Park" }];
-    }
-    return null;
-  });
-}
-
-test("US-12 getSentRequests: unauthenticated returns 401", async () => {
-  const client = db(() => null, false);
-  const res = await getSentRequests(client);
-  assert.equal(res.status, 401);
-});
-
-test("US-12 getSentRequests: returns 200 with sent requests array", async () => {
-  const res = await getSentRequests(sentDb());
-  assert.equal(res.status, 200);
-  const { requests } = await res.json();
-  assert.ok(Array.isArray(requests));
-  assert.equal(requests.length, 1);
-});
-
-test("US-12 getSentRequests: request includes session_topic, times, status, created_at", async () => {
-  const res = await getSentRequests(sentDb());
-  const { requests } = await res.json();
-  const r = requests[0];
-  assert.equal(r.session_topic, sentRow.session_topic);
-  assert.equal(r.proposed_start, sentRow.proposed_start);
-  assert.equal(r.proposed_end, sentRow.proposed_end);
-  assert.equal(r.status, "pending");
-  assert.equal(r.created_at, sentRow.created_at);
-});
-
-test("US-12 getSentRequests: receiver display name fetched from matching_goals", async () => {
-  const res = await getSentRequests(sentDb());
-  const { requests } = await res.json();
-  assert.equal(requests[0].receiver_display_name, "Sam Park");
-});
-
-test("US-12 getSentRequests: receiver_display_name is null when no goal found", async () => {
-  const res = await getSentRequests(sentDb({ goals: [] }));
-  const { requests } = await res.json();
-  assert.equal(requests[0].receiver_display_name, null);
-});
-
-test("US-12 getSentRequests: empty array when no sent requests", async () => {
-  const res = await getSentRequests(sentDb({ connections: [], goals: [] }));
-  assert.equal(res.status, 200);
-  assert.equal((await res.json()).requests.length, 0);
-});
-
-test("US-12 getSentRequests: cancelled request appears (not filtered out)", async () => {
-  const cancelled = { ...sentRow, status: "cancelled" };
-  const res = await getSentRequests(sentDb({ connections: [cancelled] }));
-  const { requests } = await res.json();
-  assert.equal(requests[0].status, "cancelled");
-});
-
-test("US-12 getSentRequests: DB error returns 503", async () => {
-  const res = await getSentRequests(sentDb({ error: true }));
-  assert.equal(res.status, 503);
-});
-
-test("US-12 getSentRequests: Cache-Control is private, no-store", async () => {
-  const res = await getSentRequests(sentDb());
-  assert.equal(res.headers.get("cache-control"), "private, no-store");
 });
