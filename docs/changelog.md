@@ -5,6 +5,20 @@ Format: `[version] — YYYY-MM-DD` · `Added` · `Changed` · `Fixed` · `Remove
 
 ---
 
+## [0.8.1] — 2026-11-25 (US-10 — View Sent Connection Requests)
+
+### Added
+
+- **`tests/connections-sent.test.ts`** — 10 new tests giving US-10 its own dedicated test file: AC1 (recipient, topic, proposed time, request date, status all present and correctly mapped per row), AC2 (own-requests-only isolation proven across two different signed-in users against a shared fixture that contains both users' rows, not just a filter-presence check), AC3 (no sent requests returns an empty array, not an error), plus result ordering (`created_at.desc`), every status rendered (not just pending), a DB-error path, and the `Cache-Control: private, no-store` header
+
+### Changed
+
+- **Story attribution**: `getSentRequests()` (`GET /api/v1/connections/sent`) shipped earlier as part of US-11's "sent" tab but had never been credited or tested against its own story. It is now documented and tested under US-10, and `lib/connections/http.ts`'s section comment/AC notes were corrected (previously mislabeled "US-12")
+- **Test relocation**: the 9 `getSentRequests` tests previously embedded in `tests/connections-cancel.test.ts` (and mislabeled `"US-12 getSentRequests: ..."`) were removed from that file and superseded by the 10 tests in the new dedicated file — net **+1 test**, total now **225 tests**
+- **`docs/features.md`** / **`README.md`**: "List sent" now attributed to US-10 (was folded into US-11); Sprint 5 renamed to credit both US-09 and US-10
+
+---
+
 ## [0.8.0] — 2026-11-25 (US-09 — Duplicate Connection Request Prevention)
 
 ### Added

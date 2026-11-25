@@ -446,13 +446,22 @@ export async function getReceivedRequests(db: SupabaseClient): Promise<Response>
   }
 }
 
-// ── US-12: get sent requests ──────────────────────────────────────────────────
+// ── US-10: view sent connection requests ──────────────────────────────────────
 
+/**
+ * AC1: each row carries the recipient, proposed topic, proposed time, request
+ *      date, and current status.
+ * AC2: only requests this user created (.eq("requester_id", userId), backed
+ *      by the connections_select RLS policy as defense in depth).
+ * AC3: no sent requests → empty array, not an error — the UI renders a
+ *      dedicated empty state for that case.
+ */
 export async function getSentRequests(db: SupabaseClient): Promise<Response> {
   try {
     const userId = await getAuthUserId(db);
     if (!userId) return reply({ error: "Sign in to view sent requests." }, 401);
 
+    // AC2: only requests sent by this user
     const { data: rows, error: connErr } = await db
       .from("connections")
       .select("id,receiver_id,session_topic,proposed_start,proposed_end,message,status,created_at")
