@@ -281,10 +281,11 @@ test("US-08 AC1: response includes session_topic, proposed_start, proposed_end",
 test("US-08 AC1: INSERT contains correct requester_id, receiver_id, session_topic, times", async () => {
   let captured: Record<string, unknown> = {};
   const client = db((url, init) => {
-    if (init?.method === "POST") {
+    if (init?.method === "POST" && url.pathname === "/rest/v1/connections") {
       captured = JSON.parse(String(init.body));
       return { id: connId };
     }
+    if (url.pathname === "/rest/v1/connections") return null; // US-09 duplicate-pending check: none found
     if (url.searchParams.has("user_id")) return ownGoal;
     if (url.searchParams.has("is_listed")) return candidateGoal;
     throw new Error("unexpected");

@@ -73,7 +73,7 @@ PartnerMatcher/
 │   ├── auth/callback/              # OAuth code exchange handler
 │   ├── api/auth/register/          # Dev-only admin register route (404 in prod)
 │   ├── api/v1/
-│   │   ├── connections/            # US-08/11/12/13: send, list, cancel, respond
+│   │   ├── connections/            # US-08/09/11/12/13: send, list, cancel, respond, prevent duplicates
 │   │   ├── favorites/              # US-17: add/remove favorite partners
 │   │   ├── matches/                # US-04/05/07: ranked partner search
 │   │   ├── matching-goals/         # US-01: create/update/delete matching goals
@@ -93,7 +93,7 @@ PartnerMatcher/
 │   │   ├── information.ts          # Goal validation, field schemas
 │   │   └── status.ts               # Pause/resume matching status
 │   ├── connections/
-│   │   └── http.ts                 # US-08/11/12/13: eligibility check, request handler
+│   │   └── http.ts                 # US-08/09/11/12/13: eligibility check, duplicate prevention, request handler
 │   ├── favorites/
 │   │   └── http.ts                 # US-17: favorites handler
 │   ├── availability/               # US-02: slot validation + CRUD
@@ -113,6 +113,7 @@ PartnerMatcher/
 │   ├── matching-status.test.ts     # US-16: pause/resume matching status
 │   ├── onboarding-courses.test.ts  # US-23: course upsert logic
 │   ├── connections.test.ts         # US-08: send connection request + eligibility
+│   ├── connections-duplicate.test.ts # US-09: duplicate pending request prevention
 │   ├── connections-cancel.test.ts  # US-12: cancel sent connection request
 │   └── connections-respond.test.ts # US-13: accept/decline received request
 ├── .github/workflows/
@@ -205,25 +206,26 @@ npm test   # or: bun run test
 
 Tests use stubbed HTTP/auth, embedded PostgreSQL (PGlite), and a fixed clock. They require no production credentials and do not write to the team database.
 
-| Test file                               | Stories      | What it covers                                                                                                                                                                                                                         | Tests |
-| --------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| `tests/matching.test.ts`                | US-04, US-05 | Matching engine: topic, availability, location scoring; urgency multiplier; no-match empty result; self-exclusion; archived/private exclusion                                                                                          | 13    |
-| `tests/matching-http.test.ts`           | US-04, US-05 | POST /api/v1/matches: 200 ranked results; 401 unauthenticated; 404 unknown goal; 422 invalid input; capacity overflow                                                                                                                  | 13    |
-| `tests/matching-database.test.ts`       | US-04, US-05 | RLS: owner reads own private goal; peer reads only listed goals; owner-only writes; ownership cannot be reassigned                                                                                                                     | 1     |
-| `tests/matching-information.test.ts`    | US-01        | Goal creation: valid submission saved; missing field returns validation error; unsupported value returns validation error                                                                                                              | 6     |
-| `tests/matching-status.test.ts`         | US-16        | PATCH /api/v1/matching-status: pause toggles visibility; 401 unauthenticated; 422 invalid body                                                                                                                                         | 4     |
-| `tests/availability-http.test.ts`       | US-02        | POST/DELETE availability slots: valid slot saved; missing field rejected; end ≤ start rejected; slot deleted; existing availability unchanged on error                                                                                 | 15    |
-| `tests/availability-validation.test.ts` | US-02        | Time format validation; IANA timezone validation; day-of-week validation; slot cap enforcement                                                                                                                                         | 12    |
-| `tests/onboarding-courses.test.ts`      | US-23        | Course upsert: course saved and linked; zero-course submit blocked; duplicate retry reuses existing row                                                                                                                                | 2     |
-| `tests/auth-register.test.ts`           | US-22        | POST /api/auth/register: 201 on success with `email_confirm:true`; 400 on missing fields; 409 on duplicate email without leaking raw Supabase text; 404 production guard                                                               | 12    |
-| `tests/auth-callback.test.ts`           | US-22        | OAuth callback: `safeNext` open-redirect prevention (8 cases); `processCallback` happy path; missing/failed code redirects to signin without leaking internal error detail                                                             | 17    |
-| `tests/middleware-routing.test.ts`      | US-22, US-23 | Routing middleware: unauthenticated users blocked from `/dashboard` and `/onboarding`; not-yet-onboarded users redirected to `/onboarding`; onboarded users redirected away from auth and onboarding pages; prefix-matching edge cases | 20    |
-| `tests/signin-errors.test.ts`           | US-22        | `classifySignInError`: generic message for wrong credentials; unconfirmed email produces confirmation prompt; raw Supabase error text never shown to user                                                                              | 9     |
-| `tests/connections.test.ts`             | US-08        | `isEligibleCandidate` unit tests (10); POST /api/v1/connections: 201 with id/topic/times; 401 unauthenticated; 404 goal not found; 422 missing/invalid fields, ineligible candidate; 409 duplicate                                     | 32    |
-| `tests/connections-cancel.test.ts`      | US-12        | PATCH /api/v1/connections/[id]: cancel own sent request; 401 unauthenticated; 404 not found; 403 cancel another user's request; 409 already-terminal status                                                                            | 21    |
-| `tests/connections-respond.test.ts`     | US-13        | PATCH /api/v1/connections/[id] accept/decline: accept updates status to accepted; decline updates to rejected; 401 unauthenticated; 403 cannot respond to own request; 404 not found; 409 already responded                            | 14    |
+| Test file                               | Stories      | What it covers                                                                                                                                                                                                                                                                                                                            | Tests |
+| --------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| `tests/matching.test.ts`                | US-04, US-05 | Matching engine: topic, availability, location scoring; urgency multiplier; no-match empty result; self-exclusion; archived/private exclusion                                                                                                                                                                                             | 13    |
+| `tests/matching-http.test.ts`           | US-04, US-05 | POST /api/v1/matches: 200 ranked results; 401 unauthenticated; 404 unknown goal; 422 invalid input; capacity overflow                                                                                                                                                                                                                     | 13    |
+| `tests/matching-database.test.ts`       | US-04, US-05 | RLS: owner reads own private goal; peer reads only listed goals; owner-only writes; ownership cannot be reassigned                                                                                                                                                                                                                        | 1     |
+| `tests/matching-information.test.ts`    | US-01        | Goal creation: valid submission saved; missing field returns validation error; unsupported value returns validation error                                                                                                                                                                                                                 | 6     |
+| `tests/matching-status.test.ts`         | US-16        | PATCH /api/v1/matching-status: pause toggles visibility; 401 unauthenticated; 422 invalid body                                                                                                                                                                                                                                            | 4     |
+| `tests/availability-http.test.ts`       | US-02        | POST/DELETE availability slots: valid slot saved; missing field rejected; end ≤ start rejected; slot deleted; existing availability unchanged on error                                                                                                                                                                                    | 15    |
+| `tests/availability-validation.test.ts` | US-02        | Time format validation; IANA timezone validation; day-of-week validation; slot cap enforcement                                                                                                                                                                                                                                            | 12    |
+| `tests/onboarding-courses.test.ts`      | US-23        | Course upsert: course saved and linked; zero-course submit blocked; duplicate retry reuses existing row                                                                                                                                                                                                                                   | 2     |
+| `tests/auth-register.test.ts`           | US-22        | POST /api/auth/register: 201 on success with `email_confirm:true`; 400 on missing fields; 409 on duplicate email without leaking raw Supabase text; 404 production guard                                                                                                                                                                  | 12    |
+| `tests/auth-callback.test.ts`           | US-22        | OAuth callback: `safeNext` open-redirect prevention (8 cases); `processCallback` happy path; missing/failed code redirects to signin without leaking internal error detail                                                                                                                                                                | 17    |
+| `tests/middleware-routing.test.ts`      | US-22, US-23 | Routing middleware: unauthenticated users blocked from `/dashboard` and `/onboarding`; not-yet-onboarded users redirected to `/onboarding`; onboarded users redirected away from auth and onboarding pages; prefix-matching edge cases                                                                                                    | 20    |
+| `tests/signin-errors.test.ts`           | US-22        | `classifySignInError`: generic message for wrong credentials; unconfirmed email produces confirmation prompt; raw Supabase error text never shown to user                                                                                                                                                                                 | 9     |
+| `tests/connections.test.ts`             | US-08        | `isEligibleCandidate` unit tests (10); POST /api/v1/connections: 201 with id/topic/times; 401 unauthenticated; 404 goal not found; 422 missing/invalid fields, ineligible candidate; 409 duplicate                                                                                                                                        | 32    |
+| `tests/connections-duplicate.test.ts`   | US-09        | POST /api/v1/connections duplicate-pending checks: 409 on identical pending request; 201 when none exists; 201 for a different session, a different time window, or a different candidate; 201 after a prior declined/cancelled request; 409 race fallback on insert-time unique violation; INSERT persists `goal_id`/`candidate_goal_id` | 9     |
+| `tests/connections-cancel.test.ts`      | US-12        | PATCH /api/v1/connections/[id]: cancel own sent request; 401 unauthenticated; 404 not found; 403 cancel another user's request; 409 already-terminal status                                                                                                                                                                               | 21    |
+| `tests/connections-respond.test.ts`     | US-13        | PATCH /api/v1/connections/[id] accept/decline: accept updates status to accepted; decline updates to rejected; 401 unauthenticated; 403 cannot respond to own request; 404 not found; 409 already responded                                                                                                                               | 14    |
 
-**Total: 191 passing tests.** All tests cover at least one error, edge, or permission case as required by the definition of done.
+**Total: 224 passing tests.** All tests cover at least one error, edge, or permission case as required by the definition of done.
 
 ---
 
@@ -231,11 +233,12 @@ Tests use stubbed HTTP/auth, embedded PostgreSQL (PGlite), and a fixed clock. Th
 
 Apply migrations once to the team Supabase project via the SQL Editor or reviewed CLI workflow. Do not replay a manually applied migration.
 
-| Migration file                                  | Applied    | What it does                                                                                                        |
-| ----------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------- |
-| `20261101014529_course_assignment_matching.sql` | 2026-10-31 | Creates matching tables, RLS policies, atomic goal-creation RPC                                                     |
-| `20261101020059_onboarding_course_insert.sql`   | 2026-10-31 | Adds authenticated INSERT permission for course catalog entries; duplicate retries reuse existing IDs               |
-| `20261111000000_us08_connection_requests.sql`   | 2026-11-11 | Extends `connections` with `session_topic`, `proposed_start`, `proposed_end`; adds end-after-start check constraint |
+| Migration file                                            | Applied    | What it does                                                                                                                                                                  |
+| --------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `20261101014529_course_assignment_matching.sql`           | 2026-10-31 | Creates matching tables, RLS policies, atomic goal-creation RPC                                                                                                               |
+| `20261101020059_onboarding_course_insert.sql`             | 2026-10-31 | Adds authenticated INSERT permission for course catalog entries; duplicate retries reuse existing IDs                                                                         |
+| `20261111000000_us08_connection_requests.sql`             | 2026-11-11 | Extends `connections` with `session_topic`, `proposed_start`, `proposed_end`; adds end-after-start check constraint                                                           |
+| `20261125000000_us09_duplicate_connection_prevention.sql` | 2026-11-25 | Adds `goal_id`/`candidate_goal_id` to `connections`; replaces blanket `UNIQUE (requester_id, receiver_id)` with a partial unique index scoped to pending requests per session |
 
 **Candidate capacity:** supports 999 eligible goals; requests 1 000 to detect overflow, matching the default Supabase Data API row cap. Lower project caps require lowering both application limits.
 
@@ -393,6 +396,18 @@ This page previously used no CSS-variable theming (plain borders, transparent ba
 - Tab-switcher active state background → `var(--brand)` / `var(--brand-fg)` (was `var(--text-heading)` / `var(--bg-page)`).
 - Pending-count badge → `var(--brand)` / `var(--brand-fg)` when inactive (was `#6366f1` / `#fff`).
 - **Bug fix**: `window.location.hash = v` was assigned inside a `switchView` event handler — a React immutability lint error. Moved to a `useEffect` keyed on `view`, skipping the initial mount via a `useRef` sentinel so it does not rewrite the hash that drove the initial tab state. Added `useRef` to the React import.
+
+### Sprint 5 — Duplicate Connection Request Prevention
+
+**Version 0.8.0**
+
+| Story | What shipped                                                                                                                                                                                                                                                                  |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-09 | Prevent duplicate pending connection requests for the same proposed session — same candidate goal (course/skill/topic/assignment/exam) and same proposed time window; a different session, a different candidate, or a prior declined/cancelled request are all still allowed |
+
+- Replaced the old blanket `UNIQUE (requester_id, receiver_id)` constraint on `connections` (which blocked _any_ second request between two users, forever) with `goal_id`/`candidate_goal_id` columns plus a partial unique index, `idx_connections_unique_pending_session`, scoped to `WHERE status = 'pending'`. See [`docs/database.md`](docs/database.md) and migration `20261125000000_us09_duplicate_connection_prevention.sql`.
+- `sendConnectionRequest()` in `lib/connections/http.ts` now runs an explicit pre-insert check for an identical pending request and returns `409 DUPLICATE_REQUEST` with a clear message; a Postgres `23505` unique-violation on INSERT (a concurrent race past that check) falls back to the same response.
+- 9 new tests: `connections-duplicate.test.ts` — total now **224 tests**.
 
 ---
 

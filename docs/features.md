@@ -119,9 +119,10 @@ Status legend: ✅ Done · 🚧 In progress · 📋 Planned · 💡 Idea
 - Validation: time format (`HH:MM`), valid IANA timezone, end must be after start, max 21 slots
 - `POST/DELETE /api/v1/availability`
 
-### ✅ Connection Requests (`/requests`) — US-08/11/12/13
+### ✅ Connection Requests (`/requests`) — US-08/09/11/12/13
 
 - **Send** (US-08): propose a session with topic, start datetime, end datetime, optional message; eligibility check ensures candidate is compatible and not already connected
+- **Prevent duplicate requests** (US-09): a second identical request for the same candidate, same session (course/skill/topic/assignment/exam), and same proposed time window is rejected with a 409 `DUPLICATE_REQUEST` while a prior pending request for it exists; a different session, a different candidate, or a prior request that was declined/cancelled is still allowed. The "Send request" button on `/partners` reflects this: it stays available (as "Send another request") while a request is pending or after it was declined, so a different session is always reachable, not only after cancelling
 - **List received** (US-11): tab showing incoming requests with status badge, partner name, proposed session details
 - **List sent** (US-11): tab showing outgoing requests with current status
 - **Cancel sent** (US-12): sender can cancel a pending request; terminal states (accepted/rejected/blocked) are locked

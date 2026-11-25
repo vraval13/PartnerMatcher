@@ -1816,7 +1816,15 @@ export default function PartnersClient({ user }: { user: User }) {
                           </button>
 
                           <div className="ml-auto flex items-center gap-2.5">
-                            {(!sent || sent.status === "cancelled") && (
+                            {/* US-09 AC3/AC5: a request can always be (re)sent — a different
+                                session (e.g. a different time window) is a new request even
+                                while one is pending, and a declined/cancelled prior request
+                                never blocks a new one. The backend is the source of truth for
+                                what counts as a duplicate; this button never blocks on its own. */}
+                            {(!sent ||
+                              sent.status === "pending" ||
+                              sent.status === "cancelled" ||
+                              sent.status === "rejected") && (
                               <button
                                 onClick={() => openConnect(m)}
                                 disabled={busy || connectBusy}
@@ -1827,7 +1835,7 @@ export default function PartnersClient({ user }: { user: User }) {
                                 }}
                               >
                                 <Icon d={icons.send} size={14} />
-                                {sent ? "Resend request" : "Send request"}
+                                {sent ? "Send another request" : "Send request"}
                               </button>
                             )}
                             {sent && sent.status === "pending" && (
@@ -1848,11 +1856,17 @@ export default function PartnersClient({ user }: { user: User }) {
                                 </button>
                               </>
                             )}
-                            {sent && sent.status !== "pending" && sent.status !== "cancelled" && (
-                              <Chip tone="success">
-                                <Icon d={icons.check} size={12} /> Request sent
-                              </Chip>
+                            {sent && sent.status === "rejected" && (
+                              <Chip tone="warn">Declined</Chip>
                             )}
+                            {sent &&
+                              sent.status !== "pending" &&
+                              sent.status !== "cancelled" &&
+                              sent.status !== "rejected" && (
+                                <Chip tone="success">
+                                  <Icon d={icons.check} size={12} /> Request sent
+                                </Chip>
+                              )}
                           </div>
                         </div>
 
