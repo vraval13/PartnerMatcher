@@ -1856,7 +1856,9 @@ export default function PartnersClient({ user }: { user: User }) {
                                 </button>
                               </>
                             )}
-                            {sent && sent.status === "rejected" && <Chip tone="warn">Declined</Chip>}
+                            {sent && sent.status === "rejected" && (
+                              <Chip tone="warn">Declined</Chip>
+                            )}
                             {sent &&
                               sent.status !== "pending" &&
                               sent.status !== "cancelled" &&
