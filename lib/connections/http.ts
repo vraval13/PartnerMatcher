@@ -1,5 +1,6 @@
 /**
  * US-08 — Send a session connection request.
+ * US-09 — Prevent duplicate pending connection requests.
  * US-11 — View received connection requests.
  *
  * Pure functions that accept an injected SupabaseClient so they can be
@@ -307,12 +308,34 @@ export async function sendConnectionRequest(
       );
     }
 
+    const { data: duplicatePending, error: dupErr } = await db
+      .from("connections")
+      .select("id")
+      .eq("requester_id", userId)
+      .eq("candidate_goal_id", candidateGoalId)
+      .eq("proposed_start", proposedStart)
+      .eq("proposed_end", proposedEnd)
+      .eq("status", "pending")
+      .maybeSingle();
+    if (dupErr) throw dupErr;
+    if (duplicatePending) {
+      return reply(
+        {
+          error: "An identical connection request for this session is already pending.",
+          code: "DUPLICATE_REQUEST",
+        },
+        409
+      );
+    }
+
     // Insert the connection request
     const { data: connection, error: insertErr } = await db
       .from("connections")
       .insert({
         requester_id: userId,
         receiver_id: (candidateGoal as GoalRow).user_id,
+        goal_id: goalId,
+        candidate_goal_id: candidateGoalId,
         status: "pending",
         session_topic: sessionTopic,
         proposed_start: proposedStart,
@@ -323,11 +346,15 @@ export async function sendConnectionRequest(
       .maybeSingle();
 
     if (insertErr) {
-      // Unique constraint (requester_id, receiver_id) → one request per pair
+      // Race guard: two concurrent identical submissions could both pass the
+      // SELECT-based check above before either INSERT commits. The partial
+      // unique index idx_connections_unique_pending_session
+      // (requester_id, candidate_goal_id, proposed_start, proposed_end)
+      // WHERE status = 'pending' catches that race with the same 409.
       if (insertErr.code === "23505") {
         return reply(
           {
-            error: "A connection request to this partner already exists.",
+            error: "An identical connection request for this session is already pending.",
             code: "DUPLICATE_REQUEST",
           },
           409

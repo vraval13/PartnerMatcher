@@ -145,18 +145,20 @@ Weekly recurring windows. Stored in UTC; `profiles.timezone` used for display.
 
 Partner connection requests and their lifecycle.
 
-| Column         | Type                   | Notes                                   |
-| -------------- | ---------------------- | --------------------------------------- |
-| `id`           | UUID PK                |                                         |
-| `requester_id` | UUID FK → auth.users   |                                         |
-| `receiver_id`  | UUID FK → auth.users   | CHECK requester ≠ receiver              |
-| `status`       | connection_status_enum | pending / accepted / rejected / blocked |
-| `message`      | TEXT                   | Max 500 chars                           |
-| `course_id`    | UUID FK → courses      | SET NULL on delete; context course      |
-| `created_at`   | TIMESTAMPTZ            |                                         |
-| `updated_at`   | TIMESTAMPTZ            |                                         |
+| Column               | Type                   | Notes                                              |
+| -------------------- | ---------------------- | --------------------------------------------------- |
+| `id`                 | UUID PK                |                                                     |
+| `requester_id`       | UUID FK → auth.users   |                                                     |
+| `receiver_id`        | UUID FK → auth.users   | CHECK requester ≠ receiver                         |
+| `status`             | connection_status_enum | pending / accepted / rejected / blocked / cancelled |
+| `message`            | TEXT                   | Max 500 chars                                       |
+| `course_id`          | UUID FK → courses      | SET NULL on delete; context course                 |
+| `goal_id`            | UUID FK → matching_goals | SET NULL on delete; requester's own goal          |
+| `candidate_goal_id`  | UUID FK → matching_goals | SET NULL on delete; the candidate's goal that identifies the proposed session (US-09) |
+| `created_at`         | TIMESTAMPTZ            |                                                     |
+| `updated_at`         | TIMESTAMPTZ            |                                                     |
 
-Unique on `(requester_id, receiver_id)`. Only the requester can create; only the receiver can accept/reject; both can update.
+**US-09 — duplicate prevention:** a partial unique index `idx_connections_unique_pending_session` on `(requester_id, candidate_goal_id, proposed_start, proposed_end) WHERE status = 'pending'` replaces the old blanket `UNIQUE (requester_id, receiver_id)`. It blocks only an identical *pending* request for the same session (same candidate goal + same proposed time window); a different goal, a different time window, a different candidate, or a prior request that was declined/cancelled are all unaffected. Only the requester can create; only the receiver can accept/reject; both can update.
 
 ---
 

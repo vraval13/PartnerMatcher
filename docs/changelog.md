@@ -5,6 +5,23 @@ Format: `[version] — YYYY-MM-DD` · `Added` · `Changed` · `Fixed` · `Remove
 
 ---
 
+## [0.8.0] — 2026-11-25 (US-09 — Duplicate Connection Request Prevention)
+
+### Added
+
+- **`goal_id` / `candidate_goal_id` columns on `connections`** — persist the requester's own matching goal and the candidate's matching goal that identifies the proposed session, so a later request can be checked against it
+- **Partial unique index `idx_connections_unique_pending_session`** on `(requester_id, candidate_goal_id, proposed_start, proposed_end) WHERE status = 'pending'` — enforces at most one pending request per requester/session/time-window combination at the database level
+- **Pre-insert duplicate check** in `sendConnectionRequest()` (`lib/connections/http.ts`) — returns `409 DUPLICATE_REQUEST` with the message "An identical connection request for this session is already pending." when an identical pending request already exists
+- **`tests/connections-duplicate.test.ts`** — 9 new tests covering AC1–AC5, the insert-time `23505` race fallback, and that `goal_id`/`candidate_goal_id` are persisted on insert
+
+### Changed
+
+- **Duplicate-request detection**: replaced the blanket `UNIQUE (requester_id, receiver_id)` constraint (which permanently blocked any second request between two users, regardless of session or status) with the session-scoped partial unique index above. A different course/skill/topic/assignment/exam, a different proposed time window, a different candidate, or a prior request that was declined/cancelled no longer blocks a new request
+- **Migration**: `20261125000000_us09_duplicate_connection_prevention.sql` drops the old constraint (looked up by definition rather than a hardcoded name) and adds the new columns/index
+- **`PartnersClient.tsx` match-card actions**: the "Send request" button is no longer hidden while a request to that candidate is pending or after it was declined — both are valid cases for a new (different-session) request under AC3/AC5, so the UI no longer blocks them. Declined requests now show a distinct "Declined" chip instead of the generic "Request sent" chip.
+
+---
+
 ## [0.7.0] — 2026-11-17 (Sprint 4 — UI Redesign & Design System)
 
 ### Added
