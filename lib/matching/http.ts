@@ -251,7 +251,7 @@ export async function previewPartner(
     if (!other.data) return unavailable();
     const candidate = goal(other.data as DBGoal);
     const [match] = rankCandidates(goal(own.data as DBGoal), [candidate], now);
-    if (!match) return unavailable();
+    if (!match) return unavailable();     const { data: paused, error: pauseError } = await db.rpc("matching_goal_is_paused", {       search_goal_id: searchGoalId,       candidate_goal_id: candidateGoalId,     });     if (pauseError) throw pauseError;     if (paused) return unavailable();
     return reply({
       profile: {
         display_name: candidate.display_name,
